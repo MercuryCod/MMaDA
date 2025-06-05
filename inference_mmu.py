@@ -54,6 +54,8 @@ if __name__ == '__main__':
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = 'cuda:7'
+    
     tokenizer = AutoTokenizer.from_pretrained(config.model.mmada.pretrained_model_path, padding_side="left")
 
     uni_prompting = UniversalPrompting(tokenizer, max_text_len=config.dataset.preprocessing.max_seq_length,

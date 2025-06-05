@@ -26,13 +26,17 @@ reserved_token_mapping = {
     '<|lvg|>': 126092,
     '[iPAD]': 126093,
     '<|r2i|>': 126094,
+    # ─── new ───
+    '<|t2m|>': 126095,
+    '<|som|>': 126096,
+    '<|eom|>': 126097,
 }
 
 
 import torch
 class UniversalPrompting():
     def __init__(self, text_tokenizer,
-                 special_tokens=("<|soi|>", "<|eoi|>", "<|sov|>", "<|eov|>", "<|t2i|>", "<|mmu|>", "<|t2v|>", "<|v2v|>", "<|lvg|>"),
+                 special_tokens=("<|soi|>", "<|eoi|>", "<|sov|>", "<|eov|>", "<|t2i|>", "<|mmu|>", "<|t2v|>", "<|v2v|>", "<|lvg|>", "<|t2m|>", "<|som|>", "<|eom|>"),
                  max_text_len=8000, max_seq_len=377, ignore_id=-100, cond_dropout_prob=0.1, use_reserved_token=False):
         """
         :param text_tokenizer: original text tokenizer
@@ -78,6 +82,66 @@ class UniversalPrompting():
         self.ignore_id = ignore_id
         self.cond_dropout_prob = cond_dropout_prob
 
+
+    # ─── new ───
+    def t2m_prompt(self, text_ids, motion_ids, labels):
+        """
+        text_ids   : list[list[int]] – tokenised captions (no task token yet)
+        motion_ids : LongTensor (B, L) – masked motion codes
+        labels     : LongTensor (B, L) – ground-truth motion codes
+        returns    : (input_ids, attention_mask, label_ids)
+        """
+        device = motion_ids.device
+        seqs, attns, lbls = [], [], []
+        probs = torch.rand(len(text_ids))                          # text drop-out
+
+        for i in range(len(text_ids)):
+            # ----- text branch ------------------------------------------------
+            if len(text_ids[i]) == 0:
+                text_ids[i] = [self.text_tokenizer.bos_token_id]
+            elif text_ids[i][0] != self.text_tokenizer.bos_token_id:
+                text_ids[i] = [self.text_tokenizer.bos_token_id] + text_ids[i]
+
+            tkn_t2m = int(self.sptids_dict['<|t2m|>'])
+            caption_ids = [tkn_t2m] + text_ids[i] + [self.text_tokenizer.eos_token_id]
+
+            # conditional dropout on caption
+            if probs[i] < self.cond_dropout_prob:
+                caption_ids = [tkn_t2m, self.text_tokenizer.bos_token_id, self.text_tokenizer.eos_token_id]
+
+            if self.max_text_len >= len(caption_ids):
+                pad_len   = self.max_text_len - len(caption_ids)
+                caption_ids = [self.pad_id] * pad_len + caption_ids
+                attn_mask   = [0] * pad_len + [1] * (len(caption_ids) - pad_len + motion_ids.shape[-1] + 2)
+            else:
+                caption_ids = caption_ids[:self.max_text_len - 1] + [self.text_tokenizer.eos_token_id]
+                attn_mask   = [1] * (len(caption_ids) + motion_ids.shape[-1] + 2)
+
+            caption_ids = torch.tensor(caption_ids, device=device)
+
+            # ----- sequence & labels -----------------------------------------
+            seq = torch.cat([
+                caption_ids,
+                self.sptids_dict['<|som|>'].to(device),
+                motion_ids[i],
+                self.sptids_dict['<|eom|>'].to(device)
+            ], dim=0)
+
+            lab = torch.cat([
+                torch.full_like(caption_ids, self.ignore_id),
+                self.sptids_dict['<|som|>'].to(device) * 0 + self.ignore_id,
+                labels[i],
+                self.sptids_dict['<|eom|>'].to(device) * 0 + self.ignore_id
+            ], dim=0)
+
+            attn_mask = torch.tensor(attn_mask, device=device)
+
+            seqs.append(seq.unsqueeze(0))
+            attns.append(attn_mask.unsqueeze(0))
+            lbls.append(lab.unsqueeze(0))
+
+        return torch.cat(seqs, 0), torch.cat(attns, 0), torch.cat(lbls, 0)
+    
     def t2i_prompt(self, text_ids, image_ids, labels):
 
         device = image_ids.device
@@ -419,7 +483,13 @@ class UniversalPrompting():
         input (tuple) : data pairs contain text(str), image(tensor), or videos(tensor).
         task (str) : a flag indicates the current task.
         """
-        if task == "t2i":
+        
+        if task == "t2m":                                    # NEW branch
+            text_ids = self.text_tokenizer(input[0])['input_ids']
+            motion_ids = input[1]                     # tuple from your trainer
+            return self.t2m_prompt(text_ids, motion_ids, input[2])
+            import pdb; pdb.set_trace()
+        elif task == "t2i":
             text_ids = self.text_tokenizer(input[0])['input_ids']  # (B, max_len)
             image_ids = input[1]  # (B, #tokens)
             sequence_ids_with_masks = self.t2i_prompt(text_ids, image_ids, input[2])

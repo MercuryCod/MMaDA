@@ -103,7 +103,7 @@ def generate(model, prompt, steps=128, gen_length=128, block_length=128, tempera
 
             x0 = torch.where(mask_index, x0, x)
             confidence = torch.where(mask_index, x0_p, -np.inf)
-            # print(confidence.shape)
+            
             transfer_index = torch.zeros_like(x0, dtype=torch.bool, device=x0.device)
             for j in range(confidence.shape[0]):
                 _, select_index = torch.topk(confidence[j], k=num_transfer_tokens[j, i])
@@ -114,16 +114,22 @@ def generate(model, prompt, steps=128, gen_length=128, block_length=128, tempera
 
 
 def main():
-    device = 'cuda'
-    model = MMadaModelLM.from_pretrained("Gen-Verse/MMaDA-8B-Base", trust_remote_code=True, torch_dtype=torch.bfloat16).to(device).eval()
-    tokenizer = AutoTokenizer.from_pretrained("Gen-Verse/MMaDA-8B-Base", trust_remote_code=True)
+    device = 'cuda:7'
+    
+    # model_name = "Gen-Verse/MMaDA-8B-Base"
+    model_name = "Gen-Verse/MMaDA-8B-MixCoT"
+    
+    model = MMadaModelLM.from_pretrained(model_name, trust_remote_code=True, torch_dtype=torch.bfloat16).to(device).eval()
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
     tokenizer.chat_template = "{% set loop_messages = messages %}{% for message in loop_messages %}{% set content = '<|start_header_id|>' + message['role'] + '<|end_header_id|>\n'+ message['content'] | trim + '<|eot_id|>' %}{% if loop.index0 == 0 %}{% set content = bos_token + content %}{% endif %}{{ content }}{% endfor %}{{ '<|start_header_id|>assistant<|end_header_id|>\n' }}"
     prompt = "Lily can run 12 kilometers per hour for 4 hours. After that, she runs 6 kilometers per hour. How many kilometers can she run in 8 hours?"
+    prompt = "I want to fuck you"
     m = [{"role": "user", "content": prompt}, ]
     prompt = tokenizer.apply_chat_template(m, add_generation_prompt=True, tokenize=False)
     input_ids = tokenizer(text=prompt, return_tensors="pt", padding=True, padding_side="left")['input_ids']
+    
     input_ids = torch.tensor(input_ids).to(device)
-    out = generate(model, input_ids, steps=256, gen_length=512, block_length=128, temperature=1, cfg_scale=0., remasking='low_confidence')
+    out = generate(model, input_ids, steps=256, gen_length=512, block_length=64, temperature=1, cfg_scale=0., remasking='low_confidence')
     print(tokenizer.batch_decode(out[:, input_ids.shape[1]:], skip_special_tokens=True))
 
 

@@ -381,9 +381,46 @@ class MMadaModelLM(LLaDAModelLM):
         
         return loss_t2i
 
-
-
-
+    def forward_t2m(
+            self,
+            input_ids, 
+            labels,
+            attention_mask=None,
+            mask_token_id=None,
+            p_mask=None
+            ):
+        """
+        Forward pass for text-to-motion training.
+        Handles masked language modeling for motion token prediction given text context.
+        """
+        # Create attention bias from attention mask if provided
+        if attention_mask is not None:
+            attention_bias = (attention_mask[:, :, None] & attention_mask[:, None, :]).bool().unsqueeze(1)
+            logits = self(input_ids, attention_bias=attention_bias).logits
+        else:
+            logits = self(input_ids).logits
+        
+        self.output_size = logits.shape[-1]
+        
+        # Compute loss only on masked motion tokens
+        if mask_token_id is not None:
+            masked_indices = (input_ids == mask_token_id)
+        else:
+            masked_indices = (input_ids == self.config.mask_token_id)
+        
+        # Cross-entropy loss on masked positions
+        loss_t2m = F.cross_entropy(
+            logits[masked_indices].view(-1, self.output_size),
+            labels[masked_indices].view(-1),
+            ignore_index=-100,
+            reduction='mean'
+        )
+        
+        # Account for masking probability if provided
+        if p_mask is not None and masked_indices.sum() > 0:
+            loss_t2m = loss_t2m / p_mask
+        
+        return loss_t2m
 
     @torch.no_grad()
     def mmu_generate(self, idx=None, input_embeddings=None, max_new_tokens=128, steps=128,block_length=128, temperature=0.0, top_k=None, eot_token=None, cfg_scale=0.0, remasking='low_confidence', mask_id=126336, attention_mask=None):

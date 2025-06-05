@@ -162,8 +162,10 @@ def main():
     # MODELS and OPTIMIZER  #
     #########################
     logger.info("Loading models and optimizer")
+    
+    # print(config.model)
 
-    tokenizer = AutoTokenizer.from_pretrained(config.model.mmada.pretrained_model_path, padding_side="left")
+    tokenizer = AutoTokenizer.from_pretrained(config.model.mmada.pretrained_model_path, trust_remote_code=True, padding_side="left")
 
     uni_prompting = UniversalPrompting(tokenizer, max_text_len=config.dataset.preprocessing.max_seq_length,
                                        special_tokens=(
@@ -190,7 +192,7 @@ def main():
     mmada_config_dict = {k: v for k, v in config.model.mmada.items()}
     merged_config = {**base_config, **mmada_config_dict}
     mmada_config = MMadaConfig(**merged_config)
-    model = MMadaModelLM.from_pretrained(config.model.mmada.pretrained_model_path, torch_dtype=torch.bfloat16, config=mmada_config)
+    model = MMadaModelLM.from_pretrained(config.model.mmada.pretrained_model_path, trust_remote_code=True, torch_dtype=torch.bfloat16, config=mmada_config)
     model.resize_token_embeddings(mmada_config.new_vocab_size)
     model.config.embedding_size = model.config.vocab_size
     model = model.to(accelerator.device)
@@ -242,7 +244,7 @@ def main():
         optimizer=optimizer,
         num_training_steps=config.training.max_train_steps,
         num_warmup_steps=config.lr_scheduler.params.warmup_steps,
-        min_lr_scale=config.lr_scheduler.params.min_lr_scale
+        min_lr_scale=config.lr_scheduler.params.get("min_lr_scale", 0.0)
     )
 
     ##################################
@@ -520,6 +522,7 @@ def main():
     data_time_m = AverageMeter()
     end = time.time()
 
+    
     for epoch in range(first_epoch, num_train_epochs):
         model.train()
         for batch, batch_idx, dataloader_idx in combined_dataloader:
