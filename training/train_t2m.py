@@ -1,7 +1,14 @@
 # ---------------------------------------------------------------------
 # Train MMada-style transformer on motion-code sequences only
 # ---------------------------------------------------------------------
-import os, sys, json, time, math, shutil, logging
+import os
+# Fix HuggingFace tokenizers parallelism warning in multiprocessing
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+import sys, json, time, math, shutil, logging
+import warnings
+# Suppress scipy RuntimeWarning from matrix square root in FID calculation
+warnings.filterwarnings("ignore", message="invalid value encountered in scalar divide", category=RuntimeWarning)
 from pathlib import Path
 from typing import Tuple
 from tqdm import tqdm
@@ -13,6 +20,7 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from accelerate.utils import DistributedType, set_seed
 import wandb
+from torch.utils.tensorboard import SummaryWriter
 from transformers import AutoTokenizer, AutoConfig
 import clip
 from os.path import join as pjoin
@@ -94,6 +102,8 @@ def main():
     vq_dir = os.path.join("./dataset/KIT-ML" if config.dataset.params.dataset_name == 'kit' else "./dataset/HumanML3D", f'{config.model.vq_model.vq_model_name}')
     config.model.vq_model.vq_dir = vq_dir
     os.makedirs(vq_dir, exist_ok=True)
+    
+    writer = SummaryWriter(config.experiment.output_dir)
 
     # Enable TF32 on Ampere GPUs
     if config.training.enable_tf32:
@@ -339,7 +349,15 @@ def main():
     batch_t = AverageMeter()
     end = time.time()
     global_step = 0
-    best_fid = 1e9
+    batch_count = 0  # Counter for manual gradient accumulation
+    best_fid = float('inf')
+    best_iter = 0  # Track the step when best FID was achieved
+    best_div = 0.0  # Best diversity value (will be updated by eval function)
+    best_top1 = 0.0  # Best top-1 R-precision (maximize)
+    best_top2 = 0.0  # Best top-2 R-precision (maximize) 
+    best_top3 = 0.0  # Best top-3 R-precision (maximize)
+    best_matching = float('inf')  # Best matching score (minimize)
+    
 
     clip_model, _ = clip.load("ViT-B/32", device=accelerator.device, jit=False)
 
@@ -367,20 +385,27 @@ def main():
             attention_mask = attention_mask.to(accelerator.device) 
             labels = labels.to(accelerator.device)
 
-            with accelerator.accumulate(model):
-                # Use the dedicated forward_t2m method for text-to-motion training
-                loss = model.forward_t2m(
-                    input_ids=input_ids,
-                    labels=labels,
-                    attention_mask=attention_mask,
-                    mask_token_id=mask_id,
-                    p_mask=mprob.mean()
-                )
-                
-                loss = loss / config.training.gradient_accumulation_steps
-                accelerator.backward(loss)
+            # Manual gradient accumulation instead of accelerator.accumulate()
+            # to avoid conflict with DeepSpeed ZeRO stage 3
+            
+            # Use the dedicated forward_t2m method for text-to-motion training
+            loss = model.forward_t2m(
+                input_ids=input_ids,
+                labels=labels,
+                attention_mask=attention_mask,
+                mask_token_id=mask_id,
+                p_mask=mprob.mean()
+            )
+            
+            loss = loss / config.training.gradient_accumulation_steps
+            accelerator.backward(loss)
 
-                if config.training.max_grad_norm and accelerator.sync_gradients:
+            # Increment batch counter
+            batch_count += 1
+
+            # Only step optimizer every gradient_accumulation_steps
+            if batch_count % config.training.gradient_accumulation_steps == 0:
+                if config.training.max_grad_norm:
                     accelerator.clip_grad_norm_(
                         model.parameters(), config.training.max_grad_norm
                     )
@@ -388,13 +413,20 @@ def main():
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad(set_to_none=True)
+                
+                # Update sync_gradients flag for logging
+                sync_gradients = True
+                # Increment global_step only when we actually step the optimizer
+                global_step += 1
+            else:
+                sync_gradients = False
 
             # ---- logging & validation ----------------------------------
-            if accelerator.sync_gradients:
+            if sync_gradients:
                 batch_t.update(time.time() - end)
                 end = time.time()
 
-                if (global_step + 1) % config.experiment.log_every == 0:
+                if global_step % config.experiment.log_every == 0:
                     accelerator.log(
                         {
                             "loss": loss.item(),
@@ -402,12 +434,12 @@ def main():
                             "mask_rate": mprob.mean().item(),
                             "batch_t": batch_t.val,
                         },
-                        step=global_step + 1,
+                        step=global_step,
                     )
                     batch_t.reset()
 
                 # ---- evaluation every eval_every ----------------------
-                if ((global_step + 1) % config.experiment.eval_every) == 0:
+                if (global_step % config.experiment.eval_every) == 0:
                     model.eval()
                     with torch.no_grad():
                         fid, div, top1, top2, top3, match = (
@@ -417,17 +449,18 @@ def main():
                                 vq_model,
                                 model,  # same signature as old code
                                 logger,
-                                None,  # tensorboard writer – not used
-                                global_step + 1,
+                                writer,  # tensorboard writer – not used
+                                global_step,
                                 best_fid,
-                                0,  # dummy best_iter
-                                1e9,
-                                0,
-                                0,
-                                0,
-                                1e9,  # other bests
+                                best_iter,
+                                best_div,
+                                best_top1,
+                                best_top2,
+                                best_top3,
+                                best_matching,
                                 clip_model=clip_model,
                                 eval_wrapper=eval_wrapper,
+                                savegif=True,
                             )
                         )
 
@@ -440,22 +473,35 @@ def main():
                             "val/top3": top3,
                             "val/matching": match,
                         },
-                        step=global_step + 1,
+                        step=global_step,
                     )
 
+                    # Update best metrics
                     if fid < best_fid:
                         best_fid = fid
+                        best_iter = global_step
                         save_checkpoint(
-                            model, accelerator, config, f"best-{global_step+1}"
+                            model, accelerator, config, f"best-{global_step}"
                         )
+                    
+                    # Update other best metrics (diversity, precision, matching)
+                    # For diversity, we store the value itself, comparison is done in eval_trans.py
+                    best_div = div
+                    if top1 > best_top1:
+                        best_top1 = top1
+                    if top2 > best_top2:
+                        best_top2 = top2  
+                    if top3 > best_top3:
+                        best_top3 = top3
+                    if match < best_matching:
+                        best_matching = match
 
                     model.train()
 
                 # ---- checkpoint ---------------------------------------
-                if (global_step + 1) % config.experiment.save_every == 0:
-                    save_checkpoint(model, accelerator, config, global_step + 1)
+                if global_step % config.experiment.save_every == 0:
+                    save_checkpoint(model, accelerator, config, global_step)
 
-                global_step += 1
                 if global_step >= config.training.max_train_steps:
                     break
         if global_step >= config.training.max_train_steps:

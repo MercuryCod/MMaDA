@@ -56,12 +56,17 @@ def plot_3d_motion(args, figsize=(10, 10), fps=120, radius=4):
         if title is not None :
             wraped_title = '\n'.join(wrap(title, 40))
             fig.suptitle(wraped_title, fontsize=16)
-        ax = p3.Axes3D(fig)
+        ax = p3.Axes3D(fig, auto_add_to_figure=False)
+        fig.add_axes(ax)
         
         init()
         
-        # ax.lines = []
-        # ax.collections = []
+        # Clear existing lines and collections in a compatible way
+        while ax.lines:
+            ax.lines[0].remove()
+        while ax.collections:
+            ax.collections[0].remove()
+        
         ax.view_init(elev=110, azim=-90)
         ax.dist = 7.5
         #         ax =
@@ -123,7 +128,5 @@ def draw_to_batch(smpl_joints_batch, title_batch=None, outname=None) :
     out = torch.stack(out, axis=0)
     return out
     
-
-
 
 

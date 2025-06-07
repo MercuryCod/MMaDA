@@ -272,11 +272,13 @@ def evaluation_transformer(out_dir, val_loader, net, trans, logger, writer, nb_i
         writer.add_scalar('./Test/matching_score', matching_score_pred, nb_iter)
 
     
-        if nb_iter % 10000 == 0 : 
+        # if nb_iter % 10000 == 0 :
+        if True:
             for ii in range(4):
                 tensorborad_add_video_xyz(writer, draw_org[ii], nb_iter, tag='./Vis/org_eval'+str(ii), nb_vis=1, title_batch=[draw_text[ii]], outname=[os.path.join(out_dir, 'gt'+str(ii)+'.gif')] if savegif else None)
             
-        if nb_iter % 10000 == 0 : 
+        # if nb_iter % 10000 == 0 : 
+        if True:
             for ii in range(4):
                 tensorborad_add_video_xyz(writer, draw_pred[ii], nb_iter, tag='./Vis/pred_eval'+str(ii), nb_vis=1, title_batch=[draw_text_pred[ii]], outname=[os.path.join(out_dir, 'pred'+str(ii)+'.gif')] if savegif else None)
 
@@ -317,7 +319,7 @@ def evaluation_transformer(out_dir, val_loader, net, trans, logger, writer, nb_i
         torch.save({'trans' : trans.state_dict()}, os.path.join(out_dir, 'net_last.pth'))
 
     trans.train()
-    return best_fid, best_iter, best_div, best_top1, best_top2, best_top3, best_matching, writer, logger
+    return fid, diversity, R_precision[0], R_precision[1], R_precision[2], matching_score_pred
 
 
 @torch.no_grad()        
