@@ -20,16 +20,16 @@ class VQVAE_251(nn.Module):
         super().__init__()
         self.code_dim = code_dim
         self.num_code = nb_code
-        self.quant = args.model.vq_model.quantizer
+        self.quant = args.model.motion_vq_model.quantizer
         self.encoder = Encoder(251 if args.dataset.params.dataset_name == 'kit' else 263, output_emb_width, down_t, stride_t, width, depth, dilation_growth_rate, activation=activation, norm=norm)
         self.decoder = Decoder(251 if args.dataset.params.dataset_name == 'kit' else 263, output_emb_width, down_t, stride_t, width, depth, dilation_growth_rate, activation=activation, norm=norm)
-        if args.model.vq_model.quantizer == "ema_reset":
+        if args.model.motion_vq_model.quantizer == "ema_reset":
             self.quantizer = QuantizeEMAReset(nb_code, code_dim, args)
-        elif args.model.vq_model.quantizer == "orig":
+        elif args.model.motion_vq_model.quantizer == "orig":
             self.quantizer = Quantizer(nb_code, code_dim, 1.0)
-        elif args.model.vq_model.quantizer == "ema":
+        elif args.model.motion_vq_model.quantizer == "ema":
             self.quantizer = QuantizeEMA(nb_code, code_dim, args)
-        elif args.quantizer == "reset":
+        elif args.model.motion_vq_model.quantizer == "reset":
             self.quantizer = QuantizeReset(nb_code, code_dim, args)
 
 

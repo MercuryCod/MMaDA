@@ -499,6 +499,15 @@ def main():
                     m_tokens = m_tokens.to(accelerator.device).long()  # (B, T)
                     m_tokens_len = m_tokens_len.to(accelerator.device)
                     
+                    # DEBUG: Print first batch info
+                    if first_batch:
+                        logger.info("=== DEBUG: First Batch Info ===")
+                        logger.info(f"Batch size: {m_tokens.shape[0]}")
+                        logger.info(f"Motion sequence length: {m_tokens.shape[1]}")
+                        logger.info(f"Raw motion tokens (first 10): {m_tokens[0, :10].tolist()}")
+                        logger.info(f"Min raw token: {m_tokens.min().item()}, Max raw token: {m_tokens.max().item()}")
+                        logger.info(f"First caption: {captions[0][:100]}...")  # First 100 chars
+                    
                     # CRITICAL FIX: Apply vocabulary offset to motion tokens ONCE
                     # Motion tokens need to be offset to their vocabulary range
                     motion_token_offset = text_vocab_size + image_codebook_size
@@ -523,6 +532,15 @@ def main():
                     # Map special tokens to vocabulary special tokens
                     m_tokens_offset[m_tokens == eom_token_dataset] = eom_token_vocab
                     m_tokens_offset[m_tokens == pad_token_dataset] = pad_token_vocab
+                    
+                    # DEBUG: Print offset tokens
+                    if first_batch:
+                        logger.info(f"Motion token offset: {motion_token_offset}")
+                        logger.info(f"Special tokens mapping: EOM {eom_token_dataset}->{eom_token_vocab}, PAD {pad_token_dataset}->{pad_token_vocab}")
+                        logger.info(f"Offset motion tokens (first 10): {m_tokens_offset[0, :10].tolist()}")
+                        logger.info(f"Min offset token: {m_tokens_offset.min().item()}, Max offset token: {m_tokens_offset.max().item()}")
+                        first_batch = False
+                        logger.info("===============================")
                     
                     # Validate token ranges - now special tokens should be in valid range
                     if torch.any(m_tokens_offset >= config.model.mmada.new_vocab_size):

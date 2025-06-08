@@ -87,8 +87,9 @@ class UniversalPrompting():
     def t2m_prompt(self, text_ids, motion_ids, labels):
         """
         text_ids   : list[list[int]] – tokenised captions (no task token yet)
-        motion_ids : LongTensor (B, L) – masked motion codes
-        labels     : LongTensor (B, L) – ground-truth motion codes
+        motion_ids : LongTensor (B, L) – masked motion codes in OFFSET vocabulary space 
+                     [text_vocab_size + image_codebook_size, text_vocab_size + image_codebook_size + motion_vocab_size - 1]
+        labels     : LongTensor (B, L) – ground-truth motion codes in OFFSET vocabulary space
         returns    : (input_ids, attention_mask, label_ids)
         """
         device = motion_ids.device

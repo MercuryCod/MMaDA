@@ -85,16 +85,23 @@ def evaluation_vqvae(out_dir, val_loader, net, logger, writer, nb_iter, best_fid
     gt_mu, gt_cov  = calculate_activation_statistics(motion_annotation_np)
     mu, cov= calculate_activation_statistics(motion_pred_np)
 
-    diversity_real = calculate_diversity(motion_annotation_np, 300 if nb_sample > 300 else 100)
-    diversity = calculate_diversity(motion_pred_np, 300 if nb_sample > 300 else 100)
+    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
+
+    # Calculate diversity with safety check for small sample sizes
+    min_samples_for_diversity = 10  # Minimum samples needed for meaningful diversity
+    if motion_annotation_np.shape[0] >= min_samples_for_diversity:
+        diversity_real = calculate_diversity(motion_annotation_np, min(300, motion_annotation_np.shape[0]//2))
+        diversity = calculate_diversity(motion_pred_np, min(300, motion_pred_np.shape[0]//2))
+    else:
+        logger.warning(f"Too few samples ({motion_annotation_np.shape[0]}) for diversity calculation, using default values")
+        diversity_real = 0.0
+        diversity = 0.0
 
     R_precision_real = R_precision_real / nb_sample
     R_precision = R_precision / nb_sample
 
     matching_score_real = matching_score_real / nb_sample
     matching_score_pred = matching_score_pred / nb_sample
-
-    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
 
     msg = f"--> \t Eva. Iter {nb_iter} :, FID. {fid:.4f}, Diversity Real. {diversity_real:.4f}, Diversity. {diversity:.4f}, R_precision_real. {R_precision_real}, R_precision. {R_precision}, matching_score_real. {matching_score_real}, matching_score_pred. {matching_score_pred}"
     logger.info(msg)
@@ -246,8 +253,17 @@ def evaluation_transformer(out_dir, val_loader, net, trans, logger, writer, nb_i
     gt_mu, gt_cov  = calculate_activation_statistics(motion_annotation_np)
     mu, cov= calculate_activation_statistics(motion_pred_np)
 
-    diversity_real = calculate_diversity(motion_annotation_np, 300 if nb_sample > 300 else 100)
-    diversity = calculate_diversity(motion_pred_np, 300 if nb_sample > 300 else 100)
+    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
+
+    # Calculate diversity with safety check for small sample sizes
+    min_samples_for_diversity = 10  # Minimum samples needed for meaningful diversity
+    if motion_annotation_np.shape[0] >= min_samples_for_diversity:
+        diversity_real = calculate_diversity(motion_annotation_np, min(300, motion_annotation_np.shape[0]//2))
+        diversity = calculate_diversity(motion_pred_np, min(300, motion_pred_np.shape[0]//2))
+    else:
+        logger.warning(f"Too few samples ({motion_annotation_np.shape[0]}) for diversity calculation, using default values")
+        diversity_real = 0.0
+        diversity = 0.0
 
     R_precision_real = R_precision_real / nb_sample
     R_precision = R_precision / nb_sample
@@ -255,8 +271,6 @@ def evaluation_transformer(out_dir, val_loader, net, trans, logger, writer, nb_i
     matching_score_real = matching_score_real / nb_sample
     matching_score_pred = matching_score_pred / nb_sample
 
-
-    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
 
     msg = f"--> \t Eva. Iter {nb_iter} :, FID. {fid:.4f}, Diversity Real. {diversity_real:.4f}, Diversity. {diversity:.4f}, R_precision_real. {R_precision_real}, R_precision. {R_precision}, matching_score_real. {matching_score_real}, matching_score_pred. {matching_score_pred}"
     logger.info(msg)
@@ -432,8 +446,17 @@ def evaluation_transformer_test(out_dir, val_loader, net, trans, logger, writer,
     gt_mu, gt_cov  = calculate_activation_statistics(motion_annotation_np)
     mu, cov= calculate_activation_statistics(motion_pred_np)
 
-    diversity_real = calculate_diversity(motion_annotation_np, 300 if nb_sample > 300 else 100)
-    diversity = calculate_diversity(motion_pred_np, 300 if nb_sample > 300 else 100)
+    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
+
+    # Calculate diversity with safety check for small sample sizes
+    min_samples_for_diversity = 10  # Minimum samples needed for meaningful diversity
+    if motion_annotation_np.shape[0] >= min_samples_for_diversity:
+        diversity_real = calculate_diversity(motion_annotation_np, min(300, motion_annotation_np.shape[0]//2))
+        diversity = calculate_diversity(motion_pred_np, min(300, motion_pred_np.shape[0]//2))
+    else:
+        logger.warning(f"Too few samples ({motion_annotation_np.shape[0]}) for diversity calculation, using default values")
+        diversity_real = 0.0
+        diversity = 0.0
 
     R_precision_real = R_precision_real / nb_sample
     R_precision = R_precision / nb_sample
@@ -444,8 +467,6 @@ def evaluation_transformer_test(out_dir, val_loader, net, trans, logger, writer,
     multimodality = 0
     motion_multimodality = torch.cat(motion_multimodality, dim=0).cpu().numpy()
     multimodality = calculate_multimodality(motion_multimodality, 10)
-
-    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
 
     msg = f"--> \t Eva. Iter {nb_iter} :, FID. {fid:.4f}, Diversity Real. {diversity_real:.4f}, Diversity. {diversity:.4f}, R_precision_real. {R_precision_real}, R_precision. {R_precision}, matching_score_real. {matching_score_real}, matching_score_pred. {matching_score_pred}, multimodality. {multimodality:.4f}"
     logger.info(msg)
@@ -547,7 +568,9 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
     if not np.isfinite(covmean).all():
         msg = ('fid calculation produces singular product; '
                'adding %s to diagonal of cov estimates') % eps
-        print(msg)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(msg)
         offset = np.eye(sigma1.shape[0]) * eps
         covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
 
@@ -611,13 +634,14 @@ def evaluation_mmada_t2m(
     mask_token_id=126336,
     motion_vocab_size=512,
     motion_seq_len=256,
+    image_codebook_size=8192,
     savegif=True,
 ):
     """
     Evaluate text-to-motion generation with MMaDA model.
     COMPLETE VERSION: With proper motion generation and GIF creation.
     """
-    print(f"========== Evaluating MMaDA T2M at iter {nb_iter} ==========")
+    logger.info(f"========== Evaluating MMaDA T2M at iter {nb_iter} ==========")
     
     mmada_model.eval()
     
@@ -664,15 +688,20 @@ def evaluation_mmada_t2m(
             for i in range(batch_size):
                 try:
                     # Create input for generation
-                    # Use proper mask tokens in offset space for generation
-                    dummy_motion_tokens = torch.full((motion_seq_len,), mask_token_id, dtype=torch.long, device=motion.device)
+                    # For evaluation, we need to create a sequence with mask tokens where motion should be generated
+                    text_vocab_size = len(uni_prompting.text_tokenizer)
+                    motion_token_offset = text_vocab_size + image_codebook_size
                     
-                    # Apply vocabulary offset to match training approach
-                    # Note: This creates input in the expected format for MMaDA
-                    offset_dummy_tokens = torch.zeros((motion_seq_len,), dtype=torch.long, device=motion.device) + len(uni_prompting.text_tokenizer)
-                    input_ids, attention_mask, _ = uni_prompting(([clip_text[i]], offset_dummy_tokens.unsqueeze(0), offset_dummy_tokens.unsqueeze(0)), 't2m')
+                    # Create dummy motion tokens in the OFFSET space to match training
+                    # These will be replaced with mask tokens after formatting
+                    # Using the first valid motion token in offset space
+                    dummy_motion_tokens = torch.full((motion_seq_len,), motion_token_offset, dtype=torch.long, device=motion.device)
                     
-                    # Set motion tokens to mask tokens for generation
+                    # Use uni_prompting to format the sequence properly
+                    # The motion tokens are expected to be in offset space, matching training
+                    input_ids, attention_mask, _ = uni_prompting(([clip_text[i]], dummy_motion_tokens.unsqueeze(0), dummy_motion_tokens.unsqueeze(0)), 't2m')
+                    
+                    # Find motion token positions and replace with mask tokens
                     som_token = int(uni_prompting.sptids_dict["<|som|>"])
                     eom_token = int(uni_prompting.sptids_dict["<|eom|>"])
                     som_pos = (input_ids[0] == som_token).nonzero(as_tuple=True)[0]
@@ -681,7 +710,11 @@ def evaluation_mmada_t2m(
                     if len(som_pos) > 0 and len(eom_pos) > 0:
                         motion_start_idx = som_pos[0].item() + 1
                         motion_end_idx = eom_pos[0].item()
+                        # Replace motion positions with mask tokens for generation
                         input_ids[0, motion_start_idx:motion_end_idx] = mask_token_id
+                    else:
+                        logger.warning(f"Could not find motion token boundaries for sample {i}")
+                        continue
                     
                     input_ids = input_ids.cuda()
                     attention_mask = attention_mask.cuda() if attention_mask is not None else None
@@ -696,10 +729,23 @@ def evaluation_mmada_t2m(
                             motion_vocab_size=motion_vocab_size,
                             seq_len=motion_seq_len,
                             timesteps=8,  # Reduced for faster evaluation
+                            image_codebook_size=image_codebook_size,  # Pass the image codebook size
                         )
                         
+                        # CRITICAL FIX: The t2m_generate method now returns tokens already in VQ-VAE space [0, motion_vocab_size-1]
+                        # No need to subtract offset since the method handles this internally
+                        generated_tokens = generated_tokens[0]
+                        
                         # Ensure tokens are in valid VQ-VAE range
-                        generated_tokens = torch.clamp(generated_tokens[0], 0, motion_vocab_size - 1)
+                        generated_tokens = torch.clamp(generated_tokens, 0, motion_vocab_size - 1)
+                        
+                        # Detect actual motion length by looking for end-of-motion token (512 in dataset space)
+                        eom_token_vqvae = motion_vocab_size  # 512 - the end-of-motion token in VQ-VAE space
+                        eom_positions = (generated_tokens == eom_token_vqvae).nonzero(as_tuple=True)[0]
+                        if len(eom_positions) > 0:
+                            # Truncate at the first end-of-motion token
+                            actual_seq_len = eom_positions[0].item()
+                            generated_tokens = generated_tokens[:actual_seq_len]
                         
                         # Decode using VQ-VAE
                         decoded_motion = vq_model.forward_decoder(generated_tokens.unsqueeze(0))
@@ -713,13 +759,13 @@ def evaluation_mmada_t2m(
                         
                         
                     except Exception as gen_error:
-                        print(f"⚠️  Generation failed for sample {i}: {gen_error}")
+                        logger.warning(f"Generation failed for sample {i}: {gen_error}")
                         # Use ground truth as fallback
                         motion_pred_eval[i, :m_length[i]] = motion[i, :m_length[i]]
                         pred_lengths[i] = m_length[i]
                 
                 except Exception as sample_error:
-                    print(f"⚠️  Sample processing failed for {i}: {sample_error}")
+                    logger.warning(f"Sample processing failed for {i}: {sample_error}")
                     # Use ground truth as fallback
                     motion_pred_eval[i, :m_length[i]] = motion[i, :m_length[i]]
                     pred_lengths[i] = m_length[i]
@@ -741,7 +787,7 @@ def evaluation_mmada_t2m(
                 matching_score_pred += temp_match
                 
             except Exception as eval_error:
-                print(f"⚠️  Embedding evaluation failed: {eval_error}")
+                logger.warning(f"Embedding evaluation failed: {eval_error}")
             
             # Prepare motions for visualization
             if savegif and len(draw_org) < 4:  # Only visualize first 4 samples
@@ -761,7 +807,7 @@ def evaluation_mmada_t2m(
                         draw_text.append(clip_text[j])
                         
                 except Exception as viz_error:
-                    print(f"⚠️  Visualization preparation failed: {viz_error}")
+                    logger.warning(f"Visualization preparation failed: {viz_error}")
             
             sample_count += batch_size
             nb_sample += batch_size
@@ -775,8 +821,16 @@ def evaluation_mmada_t2m(
             pred_mu, pred_cov = calculate_activation_statistics(motion_pred_np)
             
             fid = calculate_frechet_distance(gt_mu, gt_cov, pred_mu, pred_cov)
-            diversity_real = calculate_diversity(motion_annotation_np, min(300, motion_annotation_np.shape[0]//2))
-            diversity = calculate_diversity(motion_pred_np, min(300, motion_pred_np.shape[0]//2))
+            
+            # Calculate diversity with safety check for small sample sizes
+            min_samples_for_diversity = 10  # Minimum samples needed for meaningful diversity
+            if motion_annotation_np.shape[0] >= min_samples_for_diversity:
+                diversity_real = calculate_diversity(motion_annotation_np, min(300, motion_annotation_np.shape[0]//2))
+                diversity = calculate_diversity(motion_pred_np, min(300, motion_pred_np.shape[0]//2))
+            else:
+                logger.warning(f"Too few samples ({motion_annotation_np.shape[0]}) for diversity calculation, using default values")
+                diversity_real = 0.0
+                diversity = 0.0
             
             R_precision_real = R_precision_real / nb_sample
             R_precision = R_precision / nb_sample
@@ -784,14 +838,14 @@ def evaluation_mmada_t2m(
             matching_score_pred = matching_score_pred / nb_sample
             
         else:
-            print("⚠️  No valid samples for metric calculation, using dummy values")
+            logger.warning("No valid samples for metric calculation, using dummy values")
             fid, diversity, R_precision = 100.0, 0.0, [0.0, 0.0, 0.0]
             matching_score_pred = 100.0
         
         # Generate motion GIFs
-        if savegif and len(draw_org) > 0 and nb_iter % 10000 == 0 :
+        if savegif and len(draw_org) > 0 and nb_iter % 50 == 0 :
             try:
-                print(f"🎬 Generating motion GIFs...")
+                logger.info(f"Generating motion GIFs...")
                 
                 # Create GIFs for ground truth and predicted motions
                 for ii in range(len(draw_org)):
@@ -814,67 +868,54 @@ def evaluation_mmada_t2m(
                         title_batch=[f"Pred: {draw_text[ii]}"], 
                         outname=[gif_path_pred]
                     )
-                    
-                    print(f"📹 Generated GIFs: {gif_path_gt}, {gif_path_pred}")
                 
-                print(f"✅ Generated {len(draw_org)} motion GIF pairs")
+                logger.info(f"Generated {len(draw_org)} motion GIF pairs")
                 
             except Exception as gif_error:
-                print(f"⚠️  GIF generation failed: {gif_error}")
+                logger.warning(f"GIF generation failed: {gif_error}")
         
         # FIXED: Proper best metrics tracking and logging
         if fid < best_fid:
             msg = f"--> --> \t FID Improved from {best_fid:.5f} to {fid:.5f} !!!"
             logger.info(msg)
             best_fid, best_iter = fid, nb_iter
-            print(f"🎉 NEW BEST FID: {fid:.5f} at iteration {nb_iter}")
         
         if abs(diversity_real - diversity) < abs(diversity_real - best_div):
             msg = f"--> --> \t Diversity Improved from {best_div:.5f} to {diversity:.5f} !!!"
             logger.info(msg)
             best_div = diversity
-            print(f"🎉 NEW BEST DIVERSITY: {diversity:.5f}")
         
         if R_precision[0] > best_top1:
             msg = f"--> --> \t Top1 Improved from {best_top1:.4f} to {R_precision[0]:.4f} !!!"
             logger.info(msg)
             best_top1 = R_precision[0]
-            print(f"🎉 NEW BEST TOP1: {R_precision[0]:.4f}")
         
         if R_precision[1] > best_top2:
             msg = f"--> --> \t Top2 Improved from {best_top2:.4f} to {R_precision[1]:.4f} !!!"
             logger.info(msg)
             best_top2 = R_precision[1]
-            print(f"🎉 NEW BEST TOP2: {R_precision[1]:.4f}")
         
         if R_precision[2] > best_top3:
             msg = f"--> --> \t Top3 Improved from {best_top3:.4f} to {R_precision[2]:.4f} !!!"
             logger.info(msg)
             best_top3 = R_precision[2]
-            print(f"🎉 NEW BEST TOP3: {R_precision[2]:.4f}")
         
         if matching_score_pred < best_matching:
             msg = f"--> --> \t Matching Score Improved from {best_matching:.5f} to {matching_score_pred:.5f} !!!"
             logger.info(msg)
             best_matching = matching_score_pred
-            print(f"🎉 NEW BEST MATCHING: {matching_score_pred:.5f}")
         
         # Log results
         msg = f"--> MMaDA T2M Eval. Iter {nb_iter}: FID {fid:.4f}, Diversity {diversity:.4f}, R-precision {R_precision}, Matching {matching_score_pred:.4f}"
         logger.info(msg)
         
-        print(f"📊 Evaluation Results:")
-        print(f"   FID: {fid:.3f} (Best: {best_fid:.3f})")
-        print(f"   Diversity: {diversity:.3f} (Best: {best_div:.3f})")
-        print(f"   R-precision: {R_precision} (Best: [{best_top1:.3f}, {best_top2:.3f}, {best_top3:.3f}])")
-        print(f"   Matching Score: {matching_score_pred:.3f} (Best: {best_matching:.3f})")
-        print(f"   Samples Evaluated: {nb_sample}")
+        logger.info(f"Evaluation Results: FID: {fid:.3f} (Best: {best_fid:.3f}), Diversity: {diversity:.3f} (Best: {best_div:.3f}), R-precision: {R_precision} (Best: [{best_top1:.3f}, {best_top2:.3f}, {best_top3:.3f}]), Matching Score: {matching_score_pred:.3f} (Best: {best_matching:.3f}), Samples Evaluated: {nb_sample}")
         
         # FIXED: Return updated best metrics like other evaluation functions
         return best_fid, best_iter, best_div, best_top1, best_top2, best_top3, best_matching
         
     except Exception as eval_error:
-        print(f"❌ Evaluation failed: {eval_error}")
+        logger.error(f"Evaluation failed: {eval_error}")
         import traceback
         traceback.print_exc()
         # FIXED: Return correct number of values matching the new signature

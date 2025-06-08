@@ -8,7 +8,7 @@ class QuantizeEMAReset(nn.Module):
         super().__init__()
         self.nb_code = nb_code
         self.code_dim = code_dim
-        self.mu = args.model.vq_model.mu
+        self.mu = args.model.motion_vq_model.mu
         self.reset_codebook()
         
     def reset_codebook(self):

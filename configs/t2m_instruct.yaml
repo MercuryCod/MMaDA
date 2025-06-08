@@ -19,7 +19,11 @@ experiment:
     max_val_examples_t2i: 2000
 
 model:
-    vq_model:
+    image_vq_model:
+        type: "magvitv2"
+        vq_model_name: "showlab/magvitv2"
+
+    motion_vq_model:
         type: "vq"
         vq_model_name: "VQVAE"
         depth: 3
@@ -32,13 +36,16 @@ model:
         mu: 0.99
         resume_pth: "output/VQVAE/net_last.pth"
 
+    motion_vq_model:
+
     mmada:
         tokenizer_path: "GSAI-ML/LLaDA-8B-Instruct"
         pretrained_model_path: "Gen-Verse/MMaDA-8B-MixCoT"
         w_clip_vit: False
-        new_vocab_size: 134659
+        new_vocab_size: 135168
         llm_vocab_size: 126464
-        codebook_size: 8192
+        motion_codebook_size: 512
+        image_codebook_size: 8192
         num_vq_tokens: 256
         num_new_special_tokens: 0
         tie_word_embeddings: False
