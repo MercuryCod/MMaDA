@@ -359,7 +359,7 @@ def main():
     best_matching = float('inf')  # Best matching score (minimize)
     
 
-    clip_model, _ = clip.load("ViT-B/32", device=accelerator.device, jit=False)
+    # clip_model, _ = clip.load("ViT-B/32", device=accelerator.device, jit=False)
 
     logger.info("***** Train Text-to-Motion *****")
     for epoch in range(num_epochs):
@@ -442,12 +442,13 @@ def main():
                 if (global_step % config.experiment.eval_every) == 0:
                     model.eval()
                     with torch.no_grad():
-                        fid, div, top1, top2, top3, match = (
-                            eval_trans.evaluation_transformer(
+                        best_fid, best_iter, best_div, best_top1, best_top2, best_top3, best_matching = (
+                            eval_trans.evaluation_mmada_t2m(
                                 config.experiment.output_dir,
                                 val_loader,
                                 vq_model,
                                 model,  # same signature as old code
+                                uni_prompting,  # UniversalPrompting system
                                 logger,
                                 writer,  # tensorboard writer – not used
                                 global_step,
@@ -458,43 +459,34 @@ def main():
                                 best_top2,
                                 best_top3,
                                 best_matching,
-                                clip_model=clip_model,
-                                eval_wrapper=eval_wrapper,
+                                eval_wrapper,
+                                mask_token_id=mask_id,
+                                motion_vocab_size=config.model.vq_model.nb_code,
+                                motion_seq_len=256,
                                 savegif=True,
                             )
                         )
 
                     accelerator.log(
                         {
-                            "val/fid": fid,
-                            "val/div": div,
-                            "val/top1": top1,
-                            "val/top2": top2,
-                            "val/top3": top3,
-                            "val/matching": match,
+                            "val/fid": best_fid,
+                            "val/div": best_div,
+                            "val/top1": best_top1,
+                            "val/top2": best_top2,
+                            "val/top3": best_top3,
+                            "val/matching": best_matching,
                         },
                         step=global_step,
                     )
 
                     # Update best metrics
-                    if fid < best_fid:
-                        best_fid = fid
-                        best_iter = global_step
+                    # Best metrics are now tracked by evaluation function
+                        # Save checkpoint when FID improves (best_iter indicates when FID improved)
+                    if best_iter == global_step:
                         save_checkpoint(
                             model, accelerator, config, f"best-{global_step}"
                         )
                     
-                    # Update other best metrics (diversity, precision, matching)
-                    # For diversity, we store the value itself, comparison is done in eval_trans.py
-                    best_div = div
-                    if top1 > best_top1:
-                        best_top1 = top1
-                    if top2 > best_top2:
-                        best_top2 = top2  
-                    if top3 > best_top3:
-                        best_top3 = top3
-                    if match < best_matching:
-                        best_matching = match
 
                     model.train()
 

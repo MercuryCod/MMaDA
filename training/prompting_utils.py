@@ -488,7 +488,6 @@ class UniversalPrompting():
             text_ids = self.text_tokenizer(input[0])['input_ids']
             motion_ids = input[1]                     # tuple from your trainer
             return self.t2m_prompt(text_ids, motion_ids, input[2])
-            import pdb; pdb.set_trace()
         elif task == "t2i":
             text_ids = self.text_tokenizer(input[0])['input_ids']  # (B, max_len)
             image_ids = input[1]  # (B, #tokens)

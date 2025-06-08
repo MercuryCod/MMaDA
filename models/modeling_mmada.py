@@ -217,63 +217,69 @@ class MMadaModelLM(LLaDAModelLM):
             batch_size_t2i=0,
             batch_size_lm=0,
             batch_size_mmu=0,
+            batch_size_t2m=0,
             max_seq_length=128,
             p_mask_lm=None,
             p_mask_mmu=None,
+            p_mask_t2m=None,
             answer_lengths=None,
             t2i_masks=None,
-            answer_lengths_lm=None
+            answer_lengths_lm=None,
+            answer_lengths_t2m=None
             ):
         # attention bias, True for batch_size, 1, seq_len, seq_len  
         attention_bias = torch.ones(input_ids.shape[0], 1, input_ids.shape[1], input_ids.shape[1])
-        attention_bias_t2i = (t2i_masks[:, :, None] & t2i_masks[:, None, :]).bool().unsqueeze(1)
-        attention_bias[:batch_size_t2i] = attention_bias_t2i
+        if t2i_masks is not None:
+            attention_bias_t2i = (t2i_masks[:, :, None] & t2i_masks[:, None, :]).bool().unsqueeze(1)
+            attention_bias[:batch_size_t2i] = attention_bias_t2i
         logits = self(input_ids, attention_bias=attention_bias).logits 
-        # logits = self(input_ids).logits
         self.output_size = logits.shape[-1]
-
-        # print(f"logits shape: {logits.shape}") B, 359, vocab_size
-
         if batch_size_t2i == 0:
             loss_t2i = torch.tensor(0.0, device=input_ids.device)
         else:
-            # t2i loss
             loss_t2i = F.cross_entropy(
                 logits[:batch_size_t2i, max_seq_length + 1:].contiguous().view(-1, self.output_size),
                 labels[:batch_size_t2i, max_seq_length + 1:].contiguous().view(-1), ignore_index=-100,
                 )
-        
-        # llada loss  
         masked_indices = input_ids == self.config.mask_token_id 
         masked_indices_lm = masked_indices[batch_size_t2i:batch_size_t2i + batch_size_lm]
-        # 新增调试代码：统计每行mask数量
-        # if masked_indices_lm.numel() > 0:
-        #     mask_counts = torch.sum(masked_indices_lm, dim=1)
-        #     logging.info(f"[LM mask nums]: {mask_counts.cpu()}.")
-        # else:
-        #     logging.info("[LM mask nums] no LM sample.")
-        masked_indices_mmu = masked_indices[-batch_size_mmu:]
-        p_mask_lm = p_mask_lm.to(masked_indices_lm.device)
-        p_mask_mmu = p_mask_mmu.to(masked_indices_mmu.device)       
-        answer_lengths = answer_lengths.to(masked_indices_mmu.device) 
-        loss_lm = F.cross_entropy(
-            logits[batch_size_t2i:batch_size_t2i + batch_size_lm][masked_indices_lm].contiguous().view(-1, self.output_size),
-            labels[batch_size_t2i:batch_size_t2i + batch_size_lm][masked_indices_lm].contiguous().view(-1), ignore_index=-100, reduction='none'
-            )/p_mask_lm[masked_indices_lm]
-        # print(f"logits lm shape: {logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape}")
-        loss_lm = loss_lm.sum() / (logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape[0] * logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape[1])
-
-        # llm loss 
-        answer_lengths_lm = answer_lengths_lm.to(masked_indices_lm.device)
-        loss_lm = torch.sum(loss_lm / answer_lengths_lm[masked_indices_lm]) / (logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape[0])  
-        
-        loss_mmu = F.cross_entropy(
-            logits[-batch_size_mmu:][masked_indices_mmu].contiguous().view(-1, self.output_size),
-            labels[-batch_size_mmu:][masked_indices_mmu].contiguous().view(-1), ignore_index=-100, reduction='none'
-            )/p_mask_mmu[masked_indices_mmu]
-        loss_mmu = torch.sum(loss_mmu/answer_lengths[masked_indices_mmu]) / (logits[-batch_size_mmu:].shape[0])
-        
-        return logits, loss_t2i, loss_lm, loss_mmu
+        masked_indices_mmu = masked_indices[batch_size_t2i + batch_size_lm:batch_size_t2i + batch_size_lm + batch_size_mmu]
+        masked_indices_t2m = masked_indices[-batch_size_t2m:] if batch_size_t2m > 0 else None
+        p_mask_lm = p_mask_lm.to(masked_indices_lm.device) if p_mask_lm is not None else None
+        p_mask_mmu = p_mask_mmu.to(masked_indices_mmu.device) if p_mask_mmu is not None else None
+        p_mask_t2m = p_mask_t2m.to(masked_indices_t2m.device) if (p_mask_t2m is not None and masked_indices_t2m is not None) else None
+        answer_lengths = answer_lengths.to(masked_indices_mmu.device) if answer_lengths is not None else None
+        loss_lm = torch.tensor(0.0, device=input_ids.device)
+        if batch_size_lm > 0:
+            loss_lm = F.cross_entropy(
+                logits[batch_size_t2i:batch_size_t2i + batch_size_lm][masked_indices_lm].contiguous().view(-1, self.output_size),
+                labels[batch_size_t2i:batch_size_t2i + batch_size_lm][masked_indices_lm].contiguous().view(-1), ignore_index=-100, reduction='none'
+                )/p_mask_lm[masked_indices_lm]
+            loss_lm = loss_lm.sum() / (logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape[0] * logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape[1])
+            if answer_lengths_lm is not None:
+                answer_lengths_lm = answer_lengths_lm.to(masked_indices_lm.device)
+                loss_lm = torch.sum(loss_lm / answer_lengths_lm[masked_indices_lm]) / (logits[batch_size_t2i:batch_size_t2i + batch_size_lm].shape[0])  
+        loss_mmu = torch.tensor(0.0, device=input_ids.device)
+        if batch_size_mmu > 0:
+            loss_mmu = F.cross_entropy(
+                logits[-batch_size_mmu:][masked_indices_mmu].contiguous().view(-1, self.output_size),
+                labels[-batch_size_mmu:][masked_indices_mmu].contiguous().view(-1), ignore_index=-100, reduction='none'
+                )/p_mask_mmu[masked_indices_mmu]
+            loss_mmu = torch.sum(loss_mmu/answer_lengths[masked_indices_mmu]) / (logits[-batch_size_mmu:].shape[0])
+        loss_t2m = torch.tensor(0.0, device=input_ids.device)
+        if batch_size_t2m > 0 and masked_indices_t2m is not None:
+            loss_t2m = F.cross_entropy(
+                logits[-batch_size_t2m:][masked_indices_t2m].contiguous().view(-1, self.output_size),
+                labels[-batch_size_t2m:][masked_indices_t2m].contiguous().view(-1), ignore_index=-100, reduction='none'
+                )
+            if p_mask_t2m is not None:
+                loss_t2m = loss_t2m / p_mask_t2m[masked_indices_t2m]
+            if answer_lengths_t2m is not None:
+                answer_lengths_t2m = answer_lengths_t2m.to(masked_indices_t2m.device)
+                loss_t2m = torch.sum(loss_t2m / answer_lengths_t2m[masked_indices_t2m]) / (logits[-batch_size_t2m:].shape[0])
+            else:
+                loss_t2m = loss_t2m.mean()
+        return logits, loss_t2i, loss_lm, loss_mmu, loss_t2m
 
     def forward_process_with_r2i(
             self,
@@ -421,6 +427,128 @@ class MMadaModelLM(LLaDAModelLM):
             loss_t2m = loss_t2m / p_mask
         
         return loss_t2m
+
+    @torch.no_grad()
+    def t2m_generate(
+            self,
+            input_ids: torch.LongTensor = None,
+            attention_mask=None,
+            temperature=1.0,
+            timesteps=18,
+            noise_schedule=cosine_schedule,
+            generator: torch.Generator = None,
+            config=None,
+            seq_len=256,
+            mask_token_id=126336,
+            motion_vocab_size=512,
+            num_new_special_tokens=0,
+            **kwargs,
+    ):
+        
+        """
+        Iterative text-to-motion generation using MaskGIT-style sampling.
+        input_ids: (batch, seq_len) with masked motion tokens
+        Returns: generated motion token ids (batch, motion_seq_len)
+        """
+        num_motion_tokens = seq_len
+        uni_prompting = kwargs.get("uni_prompting", None)
+        
+        # Find where motion tokens start and end in the sequence
+        som_token = uni_prompting.sptids_dict["<|som|>"].item() if uni_prompting else None
+        eom_token = uni_prompting.sptids_dict["<|eom|>"].item() if uni_prompting else None
+        
+        # Find motion token positions
+        motion_start_idx = None
+        motion_end_idx = None
+        
+        if som_token is not None:
+            som_positions = (input_ids == som_token).nonzero(as_tuple=True)
+            if len(som_positions[1]) > 0:
+                motion_start_idx = som_positions[1][0].item() + 1
+        
+        if eom_token is not None:
+            eom_positions = (input_ids == eom_token).nonzero(as_tuple=True)
+            if len(eom_positions[1]) > 0:
+                motion_end_idx = eom_positions[1][0].item()
+        
+        # Fallback: assume motion tokens are at the end
+        if motion_start_idx is None or motion_end_idx is None:
+            motion_start_idx = input_ids.shape[1] - num_motion_tokens
+            motion_end_idx = input_ids.shape[1]
+        
+        # Extract only the motion token region
+        motion_tokens = input_ids[:, motion_start_idx:motion_end_idx].clone()
+        
+        # Initialize motion_tokens_local to track current state (already in offset space)
+        motion_tokens_local = motion_tokens.clone()
+        
+        # Iterative generation using MaskGIT schedule
+        for step in range(timesteps):
+            # Forward pass through the model
+            if attention_mask is not None:
+                attention_bias = (attention_mask[:, :, None] & attention_mask[:, None, :]).bool().unsqueeze(1)
+                logits = self(input_ids, attention_bias=attention_bias).logits
+            else:
+                logits = self(input_ids).logits
+            
+            # Extract logits for motion tokens only, and motion vocab range only
+            # FIX: Now that motion tokens are offset by text vocab size, extract from correct range
+            text_vocab_size = len(uni_prompting.text_tokenizer) if uni_prompting else 126000
+            motion_logits = logits[:, motion_start_idx:motion_end_idx, 
+                                 text_vocab_size + num_new_special_tokens:text_vocab_size + num_new_special_tokens + motion_vocab_size]
+            
+            # Sample from the logits
+            probs = motion_logits.softmax(dim=-1)
+            sampled = probs.reshape(-1, motion_logits.size(-1))
+            sampled_ids = torch.multinomial(sampled, 1, generator=generator)[:, 0].view(*motion_logits.shape[:-1])
+            
+            # FIX: Add text vocab offset to sampled tokens for consistency with training
+            text_vocab_size = len(uni_prompting.text_tokenizer) if uni_prompting else 126000
+            sampled_ids_offset = sampled_ids + text_vocab_size
+            
+            # Only update masked positions
+            unknown_map = motion_tokens_local == mask_token_id
+            sampled_ids_offset = torch.where(unknown_map, sampled_ids_offset, motion_tokens_local)
+            
+            # Update the motion tokens in input_ids with offset tokens
+            input_ids[:, motion_start_idx:motion_end_idx] = sampled_ids_offset
+            
+            # If not the last step, apply MaskGIT masking for next iteration
+            if step < timesteps - 1:
+                ratio = 1.0 * (step + 1) / timesteps
+                mask_ratio = noise_schedule(torch.tensor(ratio))
+                
+                # Get confidence scores for the sampled tokens
+                selected_probs = torch.gather(probs, -1, sampled_ids.long()[..., None])
+                selected_probs = selected_probs.squeeze(-1)
+                
+                # Don't mask tokens that were already given
+                selected_probs = torch.where(unknown_map, selected_probs, torch.finfo(selected_probs.dtype).max)
+                
+                # Calculate how many tokens to mask
+                mask_len = (num_motion_tokens * mask_ratio).floor().unsqueeze(0).to(motion_logits.device)
+                mask_len = torch.max(
+                    torch.tensor([1], device=motion_logits.device), 
+                    torch.min(unknown_map.sum(dim=-1, keepdim=True) - 1, mask_len)
+                )
+                
+                # Apply temperature and mask low-confidence tokens
+                temperature_adj = temperature * (1.0 - ratio)
+                masking = mask_by_random_topk(mask_len, selected_probs, temperature_adj, generator=generator)
+                
+                # Update local and global token representations
+                motion_tokens_local = torch.where(masking, mask_token_id, sampled_ids_offset)
+                input_ids[:, motion_start_idx:motion_end_idx] = torch.where(
+                    masking, 
+                    mask_token_id,
+                    sampled_ids_offset  # Use offset tokens for consistency
+                )
+        
+        # Return motion tokens in VQ-VAE space [0, motion_vocab_size)
+        # FIX: Convert from offset space back to VQ-VAE space for decoding
+        text_vocab_size = len(uni_prompting.text_tokenizer) if uni_prompting else 126000
+        vq_tokens = sampled_ids - text_vocab_size
+        return vq_tokens
 
     @torch.no_grad()
     def mmu_generate(self, idx=None, input_embeddings=None, max_new_tokens=128, steps=128,block_length=128, temperature=0.0, top_k=None, eot_token=None, cfg_scale=0.0, remasking='low_confidence', mask_id=126336, attention_mask=None):
@@ -698,7 +826,6 @@ class MMadaModelLM(LLaDAModelLM):
             
 
         return sampled_ids
-    
 
 AutoConfig.register("mmada", MMadaConfig)
 AutoModelForCausalLM.register(MMadaConfig, MMadaModelLM)

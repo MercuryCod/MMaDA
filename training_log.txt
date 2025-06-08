@@ -1,0 +1,368 @@
+[2025-06-07 23:22:13,298] [INFO] [real_accelerator.py:254:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-06-07 23:22:19,878] [INFO] [real_accelerator.py:254:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+Warning: The cache directory for DeepSpeed Triton autotune, /homes/55/junlin/.triton/autotune, appears to be on an NFS system. While this is generally acceptable, if you experience slowdowns or hanging when DeepSpeed exits, it is recommended to set the TRITON_CACHE_DIR environment variable to a non-NFS path.
+[2025-06-07 23:22:21,149] [INFO] [comm.py:669:init_distributed] cdb=None
+[2025-06-07 23:22:21,149] [INFO] [comm.py:700:init_distributed] Initializing TorchBackend in DeepSpeed with backend nccl
+Detected kernel version 4.18.0, which is below the recommended minimum of 5.5.0; this can cause the process to hang. It is recommended to upgrade the kernel to the minimum version or higher.
+23:22:21 | INFO | Distributed environment: DEEPSPEED  Backend: nccl
+Num processes: 1
+Process index: 0
+Local process index: 0
+Device: cuda:0
+
+Mixed precision type: bf16
+ds_config: {'train_batch_size': 'auto', 'train_micro_batch_size_per_gpu': 8, 'gradient_accumulation_steps': 2, 'zero_optimization': {'stage': 3, 'offload_optimizer': {'device': 'cpu', 'nvme_path': None}, 'offload_param': {'device': 'cpu', 'nvme_path': None}, 'stage3_gather_16bit_weights_on_model_save': True}, 'gradient_clipping': 1.0, 'steps_per_print': inf, 'bf16': {'enabled': True}, 'fp16': {'enabled': False}}
+
+wandb: Currently logged in as: mercury-chang-ma (mercury-chang-ma-university-of-oxford) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: WARNING Ignoring ID xhwatzad loaded due to resume='auto' because the run ID is set to h4kdi2yl.
+wandb: Tracking run with wandb version 0.19.11
+wandb: Run data is saved locally in /homes/55/junlin/MMaDA/wandb/run-20250607_232224-h4kdi2yl
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run mmada-training-t2m-instruct
+wandb: ⭐️ View project at https://wandb.ai/mercury-chang-ma-university-of-oxford/mmada-training-t2m
+wandb: 🚀 View run at https://wandb.ai/mercury-chang-ma-university-of-oxford/mmada-training-t2m/runs/h4kdi2yl
+  0%|          | 0/23384 [00:00<?, ?it/s]  1%|▏         | 300/23384 [00:00<00:07, 2995.20it/s]  3%|▎         | 626/23384 [00:00<00:07, 3145.96it/s]  4%|▍         | 985/23384 [00:00<00:06, 3347.98it/s]  6%|▌         | 1332/23384 [00:00<00:06, 3393.90it/s]  7%|▋         | 1706/23384 [00:00<00:06, 3515.87it/s]  9%|▉         | 2085/23384 [00:00<00:05, 3608.05it/s] 10%|█         | 2450/23384 [00:00<00:05, 3620.12it/s] 12%|█▏        | 2813/23384 [00:00<00:05, 3622.12it/s] 14%|█▎        | 3178/23384 [00:00<00:05, 3630.20it/s] 15%|█▌        | 3542/23384 [00:01<00:05, 3622.83it/s] 17%|█▋        | 3906/23384 [00:01<00:05, 3624.82it/s] 18%|█▊        | 4271/23384 [00:01<00:05, 3630.19it/s] 20%|█▉        | 4636/23384 [00:01<00:05, 3635.96it/s] 21%|██▏       | 5002/23384 [00:01<00:05, 3640.65it/s] 23%|██▎       | 5369/23384 [00:01<00:04, 3647.29it/s] 25%|██▍       | 5747/23384 [00:01<00:04, 3685.72it/s] 26%|██▌       | 6116/23384 [00:01<00:04, 3670.44it/s] 28%|██▊       | 6484/23384 [00:01<00:04, 3606.42it/s] 29%|██▉       | 6852/23384 [00:01<00:04, 3627.37it/s] 31%|███       | 7228/23384 [00:02<00:04, 3664.31it/s] 33%|███▎      | 7600/23384 [00:02<00:04, 3679.19it/s] 34%|███▍      | 7969/23384 [00:02<00:04, 3660.75it/s] 36%|███▌      | 8336/23384 [00:02<00:04, 3550.40it/s] 37%|███▋      | 8708/23384 [00:02<00:04, 3598.95it/s] 39%|███▉      | 9078/23384 [00:02<00:03, 3625.87it/s] 40%|████      | 9446/23384 [00:02<00:03, 3640.15it/s] 42%|████▏     | 9818/23384 [00:02<00:03, 3663.61it/s] 44%|████▎     | 10187/23384 [00:02<00:03, 3670.19it/s] 45%|████▌     | 10557/23384 [00:02<00:03, 3677.29it/s] 47%|████▋     | 10931/23384 [00:03<00:03, 3695.21it/s] 48%|████▊     | 11302/23384 [00:03<00:03, 3698.33it/s] 50%|████▉     | 11672/23384 [00:03<00:03, 3661.20it/s] 51%|█████▏    | 12039/23384 [00:03<00:03, 3650.55it/s] 53%|█████▎    | 12413/23384 [00:03<00:02, 3674.75it/s] 55%|█████▍    | 12781/23384 [00:03<00:02, 3668.38it/s] 56%|█████▌    | 13149/23384 [00:03<00:02, 3670.12it/s] 58%|█████▊    | 13517/23384 [00:03<00:02, 3660.92it/s] 59%|█████▉    | 13884/23384 [00:03<00:02, 3656.56it/s] 61%|██████    | 14250/23384 [00:03<00:02, 3637.43it/s] 63%|██████▎   | 14616/23384 [00:04<00:02, 3643.40it/s] 64%|██████▍   | 14983/23384 [00:04<00:02, 3648.23it/s] 66%|██████▌   | 15349/23384 [00:04<00:02, 3651.64it/s] 67%|██████▋   | 15715/23384 [00:04<00:02, 3648.07it/s] 69%|██████▉   | 16080/23384 [00:04<00:02, 3634.49it/s] 70%|███████   | 16444/23384 [00:04<00:01, 3618.87it/s] 72%|███████▏  | 16806/23384 [00:04<00:01, 3602.72it/s] 73%|███████▎  | 17167/23384 [00:04<00:01, 3532.99it/s] 75%|███████▍  | 17522/23384 [00:04<00:01, 3537.83it/s] 76%|███████▋  | 17877/23384 [00:04<00:01, 3540.00it/s] 78%|███████▊  | 18232/23384 [00:05<00:01, 3536.23it/s] 80%|███████▉  | 18593/23384 [00:05<00:01, 3556.50it/s] 81%|████████  | 18949/23384 [00:05<00:01, 3550.50it/s] 83%|████████▎ | 19308/23384 [00:05<00:01, 3561.82it/s] 84%|████████▍ | 19678/23384 [00:05<00:01, 3600.30it/s] 86%|████████▌ | 20056/23384 [00:05<00:00, 3653.96it/s] 87%|████████▋ | 20444/23384 [00:05<00:00, 3718.98it/s] 89%|████████▉ | 20816/23384 [00:05<00:00, 3679.93it/s] 91%|█████████ | 21185/23384 [00:05<00:00, 3636.64it/s] 92%|█████████▏| 21567/23384 [00:05<00:00, 3690.45it/s] 94%|█████████▍| 21948/23384 [00:06<00:00, 3725.29it/s] 95%|█████████▌| 22321/23384 [00:06<00:00, 3638.00it/s] 97%|█████████▋| 22704/23384 [00:06<00:00, 3693.20it/s] 99%|█████████▊| 23074/23384 [00:06<00:00, 3666.00it/s]100%|██████████| 23384/23384 [00:06<00:00, 3625.00it/s]
+  0%|          | 0/1460 [00:00<?, ?it/s] 16%|█▌        | 231/1460 [00:00<00:00, 2308.95it/s] 32%|███▏      | 472/1460 [00:00<00:00, 2367.12it/s] 49%|████▊     | 710/1460 [00:00<00:00, 2370.57it/s] 65%|██████▍   | 948/1460 [00:00<00:00, 2307.95it/s] 82%|████████▏ | 1190/1460 [00:00<00:00, 2344.17it/s] 98%|█████████▊| 1425/1460 [00:00<00:00, 2344.20it/s]100%|██████████| 1460/1460 [00:00<00:00, 2336.98it/s]
+Pointer Pointing at 0
+Reading checkpoints/t2m/Comp_v6_KLD005/opt.txt
+Loading Evaluation Model Wrapper (Epoch 28) Completed!!
+23:22:38 | INFO | loading checkpoint from output/VQVAE/net_last.pth
+  0%|          | 0/23384 [00:00<?, ?it/s]  1%|          | 284/23384 [00:00<00:08, 2836.65it/s]  2%|▏         | 577/23384 [00:00<00:07, 2891.43it/s]  4%|▍         | 877/23384 [00:00<00:07, 2937.13it/s]  5%|▌         | 1171/23384 [00:00<00:07, 2864.25it/s]  6%|▌         | 1458/23384 [00:00<00:07, 2849.22it/s]  7%|▋         | 1744/23384 [00:00<00:07, 2790.07it/s]  9%|▊         | 2024/23384 [00:00<00:07, 2761.22it/s] 10%|▉         | 2301/23384 [00:00<00:07, 2755.35it/s] 11%|█         | 2577/23384 [00:00<00:07, 2745.40it/s] 12%|█▏        | 2875/23384 [00:01<00:07, 2815.80it/s] 14%|█▎        | 3170/23384 [00:01<00:07, 2854.47it/s] 15%|█▍        | 3456/23384 [00:01<00:07, 2760.71it/s] 16%|█▌        | 3733/23384 [00:01<00:07, 2751.19it/s] 17%|█▋        | 4009/23384 [00:01<00:07, 2727.65it/s] 18%|█▊        | 4283/23384 [00:01<00:07, 2716.54it/s] 20%|█▉        | 4575/23384 [00:01<00:06, 2776.25it/s] 21%|██        | 4853/23384 [00:01<00:06, 2741.96it/s] 22%|██▏       | 5146/23384 [00:01<00:06, 2795.25it/s] 23%|██▎       | 5433/23384 [00:01<00:06, 2815.04it/s] 24%|██▍       | 5715/23384 [00:02<00:06, 2772.00it/s] 26%|██▌       | 6002/23384 [00:02<00:06, 2800.52it/s] 27%|██▋       | 6283/23384 [00:02<00:06, 2725.33it/s] 28%|██▊       | 6565/23384 [00:02<00:06, 2752.62it/s] 29%|██▉       | 6841/23384 [00:02<00:06, 2731.06it/s] 31%|███       | 7140/23384 [00:02<00:05, 2806.07it/s] 32%|███▏      | 7421/23384 [00:02<00:05, 2727.64it/s] 33%|███▎      | 7701/23384 [00:02<00:05, 2748.67it/s] 34%|███▍      | 7987/23384 [00:02<00:05, 2780.21it/s] 35%|███▌      | 8266/23384 [00:02<00:05, 2741.03it/s] 37%|███▋      | 8541/23384 [00:03<00:05, 2690.68it/s] 38%|███▊      | 8822/23384 [00:03<00:05, 2723.67it/s] 39%|███▉      | 9095/23384 [00:03<00:05, 2677.75it/s] 40%|████      | 9364/23384 [00:03<00:05, 2604.91it/s] 41%|████      | 9639/23384 [00:03<00:05, 2644.43it/s] 42%|████▏     | 9909/23384 [00:03<00:05, 2660.43it/s] 44%|████▎     | 10176/23384 [00:03<00:08, 1491.93it/s] 45%|████▍     | 10437/23384 [00:04<00:07, 1704.88it/s] 46%|████▌     | 10723/23384 [00:04<00:06, 1950.66it/s] 47%|████▋     | 10989/23384 [00:04<00:05, 2115.19it/s] 48%|████▊     | 11273/23384 [00:04<00:05, 2296.52it/s] 49%|████▉     | 11534/23384 [00:04<00:04, 2378.87it/s] 50%|█████     | 11795/23384 [00:04<00:04, 2426.49it/s] 52%|█████▏    | 12084/23384 [00:04<00:04, 2555.61it/s] 53%|█████▎    | 12352/23384 [00:04<00:04, 2582.76it/s] 54%|█████▍    | 12619/23384 [00:04<00:04, 2587.25it/s] 55%|█████▌    | 12911/23384 [00:04<00:03, 2682.35it/s] 56%|█████▋    | 13184/23384 [00:05<00:03, 2629.05it/s] 58%|█████▊    | 13460/23384 [00:05<00:03, 2665.72it/s] 59%|█████▉    | 13741/23384 [00:05<00:03, 2706.33it/s] 60%|█████▉    | 14014/23384 [00:05<00:03, 2680.40it/s] 61%|██████    | 14284/23384 [00:05<00:03, 2657.64it/s] 62%|██████▏   | 14551/23384 [00:05<00:03, 2648.63it/s] 63%|██████▎   | 14817/23384 [00:05<00:03, 2615.05it/s] 64%|██████▍   | 15079/23384 [00:05<00:03, 2597.70it/s] 66%|██████▌   | 15340/23384 [00:05<00:03, 2541.58it/s] 67%|██████▋   | 15595/23384 [00:06<00:03, 2531.29it/s] 68%|██████▊   | 15858/23384 [00:06<00:02, 2557.36it/s] 69%|██████▉   | 16114/23384 [00:06<00:02, 2557.01it/s] 70%|███████   | 16371/23384 [00:06<00:02, 2559.20it/s] 71%|███████   | 16629/23384 [00:06<00:02, 2563.12it/s] 72%|███████▏  | 16886/23384 [00:06<00:02, 2530.93it/s] 73%|███████▎  | 17140/23384 [00:06<00:02, 2530.93it/s] 74%|███████▍  | 17414/23384 [00:06<00:02, 2591.23it/s] 76%|███████▌  | 17692/23384 [00:06<00:02, 2645.32it/s] 77%|███████▋  | 17957/23384 [00:06<00:02, 2617.74it/s] 78%|███████▊  | 18219/23384 [00:07<00:02, 2575.29it/s] 79%|███████▉  | 18480/23384 [00:07<00:01, 2583.39it/s] 80%|████████  | 18743/23384 [00:07<00:01, 2595.50it/s] 81%|████████▏ | 19023/23384 [00:07<00:01, 2655.73it/s] 83%|████████▎ | 19294/23384 [00:07<00:01, 2669.93it/s] 84%|████████▎ | 19566/23384 [00:07<00:01, 2683.60it/s] 85%|████████▍ | 19835/23384 [00:07<00:01, 2648.83it/s] 86%|████████▌ | 20101/23384 [00:07<00:01, 2569.32it/s] 87%|████████▋ | 20359/23384 [00:07<00:01, 2550.75it/s] 88%|████████▊ | 20615/23384 [00:07<00:01, 2541.18it/s] 89%|████████▉ | 20888/23384 [00:08<00:00, 2594.59it/s] 90%|█████████ | 21148/23384 [00:08<00:00, 2575.61it/s] 92%|█████████▏| 21425/23384 [00:08<00:00, 2630.58it/s] 93%|█████████▎| 21689/23384 [00:08<00:00, 2611.25it/s] 94%|█████████▍| 21951/23384 [00:08<00:00, 2591.57it/s] 95%|█████████▌| 22224/23384 [00:08<00:00, 2630.93it/s] 96%|█████████▌| 22488/23384 [00:08<00:00, 2602.93it/s] 97%|█████████▋| 22763/23384 [00:08<00:00, 2644.24it/s] 98%|█████████▊| 23028/23384 [00:08<00:00, 2600.68it/s]100%|█████████▉| 23291/23384 [00:08<00:00, 2607.07it/s]100%|██████████| 23384/23384 [00:09<00:00, 2597.36it/s]
+self.sptids_dict: {'<|soi|>': tensor([126084]), '<|eoi|>': tensor([126085]), '<|sov|>': tensor([126086]), '<|eov|>': tensor([126087]), '<|t2i|>': tensor([126088]), '<|mmu|>': tensor([126089]), '<|t2v|>': tensor([126090]), '<|v2v|>': tensor([126091]), '<|lvg|>': tensor([126092]), '[iPAD]': tensor([126093]), '<|r2i|>': tensor([126094]), '<|t2m|>': tensor([126095]), '<|som|>': tensor([126096]), '<|eom|>': tensor([126097]), '<|sot|>': tensor([126080]), '<|eot|>': tensor([126081]), '<|end_header_id|>': tensor([126347]), '<|eot_id|>': tensor([126348]), '<|start_header_id|>': tensor([126346])}
+special tokens : 
+ {'<|soi|>': tensor([126084]), '<|eoi|>': tensor([126085]), '<|sov|>': tensor([126086]), '<|eov|>': tensor([126087]), '<|t2i|>': tensor([126088]), '<|mmu|>': tensor([126089]), '<|t2v|>': tensor([126090]), '<|v2v|>': tensor([126091]), '<|lvg|>': tensor([126092]), '[iPAD]': tensor([126093]), '<|r2i|>': tensor([126094]), '<|t2m|>': tensor([126095]), '<|som|>': tensor([126096]), '<|eom|>': tensor([126097]), '<|sot|>': tensor([126080]), '<|eot|>': tensor([126081]), '<|end_header_id|>': tensor([126347]), '<|eot_id|>': tensor([126348]), '<|start_header_id|>': tensor([126346])}
+The argument `trust_remote_code` is to be used with Auto classes. It has no effect here and is ignored.
+[2025-06-07 23:22:50,187] [INFO] [config.py:735:__init__] Config mesh_device None world_size = 1
+Initializing MMadaModelLM with config: MMadaConfig {
+  "_attn_implementation_autoset": true,
+  "_name_or_path": "Gen-Verse/MMaDA-8B-MixCoT",
+  "activation_type": "silu",
+  "alibi": false,
+  "alibi_bias_max": 8.0,
+  "architectures": [
+    "LLaDAModelLM"
+  ],
+  "attention_dropout": 0.0,
+  "attention_layer_norm": false,
+  "attention_layer_norm_with_affine": true,
+  "auto_map": {
+    "AutoConfig": "Gen-Verse/MMaDA-8B-MixCoT--configuration_llada.LLaDAConfig",
+    "AutoModel": "Gen-Verse/MMaDA-8B-MixCoT--modeling_llada.LLaDAModelLM",
+    "AutoModelForCausalLM": "Gen-Verse/MMaDA-8B-MixCoT--modeling_llada.LLaDAModelLM"
+  },
+  "bias_for_layer_norm": false,
+  "block_group_size": 1,
+  "block_type": "llama",
+  "codebook_size": 512,
+  "d_model": 4096,
+  "embedding_dropout": 0.0,
+  "embedding_size": 134656,
+  "eos_token_id": 126081,
+  "flash_attention": false,
+  "include_bias": false,
+  "include_qkv_bias": false,
+  "init_cutoff_factor": null,
+  "init_device": "meta",
+  "init_fn": "mitchell",
+  "init_std": 0.02,
+  "input_emb_norm": false,
+  "layer_norm_type": "rms",
+  "layer_norm_with_affine": true,
+  "llm_vocab_size": 126464,
+  "mask_token_id": 126336,
+  "max_sequence_length": 4096,
+  "mlp_hidden_size": 12288,
+  "mlp_ratio": 4,
+  "model_type": "mmada",
+  "multi_query_attention": null,
+  "n_heads": 32,
+  "n_kv_heads": 32,
+  "n_layers": 32,
+  "new_vocab_size": 134659,
+  "num_new_special_tokens": 3,
+  "num_vq_tokens": 256,
+  "pad_token_id": 126081,
+  "precision": "amp_bf16",
+  "pretrained_model_path": "Gen-Verse/MMaDA-8B-MixCoT",
+  "residual_dropout": 0.0,
+  "rms_norm_eps": 1e-05,
+  "rope": true,
+  "rope_full_precision": true,
+  "rope_theta": 500000.0,
+  "scale_logits": false,
+  "tie_word_embeddings": false,
+  "tokenizer_path": "GSAI-ML/LLaDA-8B-Instruct",
+  "torch_dtype": "bfloat16",
+  "transformers_version": "4.46.0",
+  "use_cache": false,
+  "vocab_size": 134656,
+  "w_clip_vit": false,
+  "weight_tying": false
+}
+
+[2025-06-07 23:22:53,543] [INFO] [partition_parameters.py:348:__exit__] finished initializing model - num_params = 291, num_elems = 8.08B
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:01<00:04,  1.52s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:03<00:03,  1.57s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:04<00:01,  1.57s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:05<00:00,  1.19s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:05<00:00,  1.33s/it]
+The new embeddings will be initialized from a multivariate normal distribution that has old embeddings' mean and covariance. As described in this article: https://nlp.stanford.edu/~johnhew/vocab-expansion.html. To disable this, use `mean_resizing=False`
+The new lm_head weights will be initialized from a multivariate normal distribution that has old embeddings' mean and covariance. As described in this article: https://nlp.stanford.edu/~johnhew/vocab-expansion.html. To disable this, use `mean_resizing=False`
+Installed CUDA version 12.1 does not match the version torch was compiled with 12.6 but since the APIs are compatible, accepting this combination
+Using /homes/55/junlin/.cache/torch_extensions/py310_cu126 as PyTorch extensions root...
+Detected CUDA files, patching ldflags
+Emitting ninja build file /homes/55/junlin/.cache/torch_extensions/py310_cu126/cpu_adam/build.ninja...
+/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/torch/utils/cpp_extension.py:2356: UserWarning: TORCH_CUDA_ARCH_LIST is not set, all archs for visible cards are included for compilation. 
+If this is not desired, please set os.environ['TORCH_CUDA_ARCH_LIST'].
+  warnings.warn(
+Building extension module cpu_adam...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module cpu_adam...
+Time to load cpu_adam op: 0.22389817237854004 seconds
+Adam Optimizer #0 is created with AVX2 arithmetic capability.
+Config: alpha=0.000050, betas=(0.900000, 0.999000), weight_decay=0.010000, adam_w=1
+[2025-06-07 23:23:24,058] [INFO] [logging.py:107:log_dist] [Rank 0] DeepSpeed info: version=0.16.9, git-hash=unknown, git-branch=unknown
+[2025-06-07 23:23:24,058] [INFO] [config.py:735:__init__] Config mesh_device None world_size = 1
+[2025-06-07 23:23:24,069] [INFO] [logging.py:107:log_dist] [Rank 0] DeepSpeed Flops Profiler Enabled: False
+[2025-06-07 23:23:24,070] [INFO] [logging.py:107:log_dist] [Rank 0] Using client Optimizer as basic optimizer
+[2025-06-07 23:23:24,070] [INFO] [logging.py:107:log_dist] [Rank 0] Removing param_group that has no 'params' in the basic Optimizer
+[2025-06-07 23:23:24,080] [INFO] [logging.py:107:log_dist] [Rank 0] DeepSpeed Basic Optimizer = DeepSpeedCPUAdam
+[2025-06-07 23:23:24,080] [INFO] [utils.py:59:is_zero_supported_optimizer] Checking ZeRO support for optimizer=DeepSpeedCPUAdam type=<class 'deepspeed.ops.adam.cpu_adam.DeepSpeedCPUAdam'>
+[2025-06-07 23:23:24,081] [INFO] [logging.py:107:log_dist] [Rank 0] Creating fp16 ZeRO stage 3 optimizer, MiCS is enabled False, Hierarchical params gather False
+[2025-06-07 23:23:24,081] [INFO] [logging.py:107:log_dist] [Rank 0] Creating torch.bfloat16 ZeRO stage 3 optimizer
+[2025-06-07 23:23:24,679] [INFO] [utils.py:781:see_memory_usage] Stage 3 initialize beginning
+[2025-06-07 23:23:24,680] [INFO] [utils.py:782:see_memory_usage] MA 2.22 GB         Max_MA 7.48 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:24,680] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 28.4 GB, percent = 5.6%
+[2025-06-07 23:23:24,682] [INFO] [stage3.py:170:__init__] Reduce bucket size 500000000
+[2025-06-07 23:23:24,682] [INFO] [stage3.py:171:__init__] Prefetch bucket size 50000000
+[2025-06-07 23:23:24,958] [INFO] [utils.py:781:see_memory_usage] DeepSpeedZeRoOffload initialize [begin]
+[2025-06-07 23:23:24,959] [INFO] [utils.py:782:see_memory_usage] MA 2.22 GB         Max_MA 2.22 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:24,959] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 28.42 GB, percent = 5.6%
+Parameter Offload: Total persistent parameters: 266240 in 65 params
+[2025-06-07 23:23:25,739] [INFO] [utils.py:781:see_memory_usage] DeepSpeedZeRoOffload initialize [end]
+[2025-06-07 23:23:25,740] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 2.22 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:25,740] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 30.47 GB, percent = 6.1%
+[2025-06-07 23:23:26,028] [INFO] [utils.py:781:see_memory_usage] Before creating fp16 partitions
+[2025-06-07 23:23:26,029] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 0.16 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:26,030] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 30.47 GB, percent = 6.1%
+/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:4631: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user. 
+  warnings.warn(  # warn only once
+[2025-06-07 23:23:31,813] [INFO] [utils.py:781:see_memory_usage] After creating fp16 partitions: 8
+[2025-06-07 23:23:31,814] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 0.16 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:31,815] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 31.81 GB, percent = 6.3%
+[2025-06-07 23:23:32,102] [INFO] [utils.py:781:see_memory_usage] Before creating fp32 partitions
+[2025-06-07 23:23:32,103] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 0.16 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:32,103] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 31.82 GB, percent = 6.3%
+[2025-06-07 23:23:33,154] [INFO] [utils.py:781:see_memory_usage] After creating fp32 partitions
+[2025-06-07 23:23:33,155] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 0.16 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:33,156] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 61.98 GB, percent = 12.3%
+[2025-06-07 23:23:33,448] [INFO] [utils.py:781:see_memory_usage] Before initializing optimizer states
+[2025-06-07 23:23:33,449] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 0.16 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:33,450] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 61.98 GB, percent = 12.3%
+[2025-06-07 23:23:34,066] [INFO] [utils.py:781:see_memory_usage] After initializing optimizer states
+[2025-06-07 23:23:34,067] [INFO] [utils.py:782:see_memory_usage] MA 0.16 GB         Max_MA 0.16 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:34,068] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 92.16 GB, percent = 18.3%
+[2025-06-07 23:23:34,068] [INFO] [stage3.py:534:_setup_for_real_optimizer] optimizer state initialized
+[2025-06-07 23:23:35,216] [INFO] [utils.py:781:see_memory_usage] After initializing ZeRO optimizer
+[2025-06-07 23:23:35,217] [INFO] [utils.py:782:see_memory_usage] MA 1.1 GB         Max_MA 3.15 GB         CA 9.5 GB         Max_CA 9 GB 
+[2025-06-07 23:23:35,217] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 107.23 GB, percent = 21.3%
+[2025-06-07 23:23:35,217] [INFO] [logging.py:107:log_dist] [Rank 0] DeepSpeed Final Optimizer = DeepSpeedZeroOptimizer_Stage3
+[2025-06-07 23:23:35,217] [INFO] [logging.py:107:log_dist] [Rank 0] DeepSpeed using configured LR scheduler = None
+[2025-06-07 23:23:35,217] [INFO] [logging.py:107:log_dist] [Rank 0] DeepSpeed LR Scheduler = None
+[2025-06-07 23:23:35,218] [INFO] [logging.py:107:log_dist] [Rank 0] step=0, skipped=0, lr=[0.0], mom=[(0.9, 0.999)]
+[2025-06-07 23:23:35,219] [INFO] [config.py:1003:print] DeepSpeedEngine configuration:
+[2025-06-07 23:23:35,219] [INFO] [config.py:1007:print]   activation_checkpointing_config  {
+    "partition_activations": false, 
+    "contiguous_memory_optimization": false, 
+    "cpu_checkpointing": false, 
+    "number_checkpoints": null, 
+    "synchronize_checkpoint_boundary": false, 
+    "profile": false
+}
+[2025-06-07 23:23:35,219] [INFO] [config.py:1007:print]   aio_config ................... {'block_size': 1048576, 'queue_depth': 8, 'intra_op_parallelism': 1, 'single_submit': False, 'overlap_events': True, 'use_gds': False}
+[2025-06-07 23:23:35,219] [INFO] [config.py:1007:print]   amp_enabled .................. False
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   amp_params ................... False
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   autotuning_config ............ {
+    "enabled": false, 
+    "start_step": null, 
+    "end_step": null, 
+    "metric_path": null, 
+    "arg_mappings": null, 
+    "metric": "throughput", 
+    "model_info": null, 
+    "results_dir": "autotuning_results", 
+    "exps_dir": "autotuning_exps", 
+    "overwrite": true, 
+    "fast": true, 
+    "start_profile_step": 3, 
+    "end_profile_step": 5, 
+    "tuner_type": "gridsearch", 
+    "tuner_early_stopping": 5, 
+    "tuner_num_trials": 50, 
+    "model_info_path": null, 
+    "mp_size": 1, 
+    "max_train_batch_size": null, 
+    "min_train_batch_size": 1, 
+    "max_train_micro_batch_size_per_gpu": 1.024000e+03, 
+    "min_train_micro_batch_size_per_gpu": 1, 
+    "num_tuning_micro_batch_sizes": 3
+}
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   bfloat16_enabled ............. True
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   bfloat16_immediate_grad_update  True
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   checkpoint_parallel_write_pipeline  False
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   checkpoint_tag_validation_enabled  True
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   checkpoint_tag_validation_fail  False
+[2025-06-07 23:23:35,220] [INFO] [config.py:1007:print]   comms_config ................. <deepspeed.comm.config.DeepSpeedCommsConfig object at 0x7fc758b31000>
+[2025-06-07 23:23:35,221] [INFO] [config.py:1007:print]   communication_data_type ...... None
+[2025-06-07 23:23:35,221] [INFO] [config.py:1007:print]   compile_config ............... deepcompile=False free_activation=False offload_activation=False offload_opt_states=False double_buffer=True symmetric_memory=False debug_log=False offload_parameters=False sync_before_reduce=False sync_after_reduce=False sync_before_allgather=False sync_after_allgather=False
+[2025-06-07 23:23:35,221] [INFO] [config.py:1007:print]   compression_config ........... {'weight_quantization': {'shared_parameters': {'enabled': False, 'quantizer_kernel': False, 'schedule_offset': 0, 'quantize_groups': 1, 'quantize_verbose': False, 'quantization_type': 'symmetric', 'quantize_weight_in_forward': False, 'rounding': 'nearest', 'fp16_mixed_quantize': False, 'quantize_change_ratio': 0.001}, 'different_groups': {}}, 'activation_quantization': {'shared_parameters': {'enabled': False, 'quantization_type': 'symmetric', 'range_calibration': 'dynamic', 'schedule_offset': 1000}, 'different_groups': {}}, 'sparse_pruning': {'shared_parameters': {'enabled': False, 'method': 'l1', 'schedule_offset': 1000}, 'different_groups': {}}, 'row_pruning': {'shared_parameters': {'enabled': False, 'method': 'l1', 'schedule_offset': 1000}, 'different_groups': {}}, 'head_pruning': {'shared_parameters': {'enabled': False, 'method': 'topk', 'schedule_offset': 1000}, 'different_groups': {}}, 'channel_pruning': {'shared_parameters': {'enabled': False, 'method': 'l1', 'schedule_offset': 1000}, 'different_groups': {}}, 'layer_reduction': {'enabled': False}}
+[2025-06-07 23:23:35,221] [INFO] [config.py:1007:print]   curriculum_enabled_legacy .... False
+[2025-06-07 23:23:35,221] [INFO] [config.py:1007:print]   curriculum_params_legacy ..... False
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   data_efficiency_config ....... {'enabled': False, 'seed': 1234, 'data_sampling': {'enabled': False, 'num_epochs': 1000, 'num_workers': 0, 'pin_memory': False, 'curriculum_learning': {'enabled': False}, 'dynamic_batching': {'enabled': False, 'lr_scaling_method': 'linear', 'min_batch_size': 1, 'max_batch_size': None, 'sequence_picking_order': 'dataloader', 'verbose': False}}, 'data_routing': {'enabled': False, 'random_ltd': {'enabled': False, 'layer_token_lr_schedule': {'enabled': False}}}}
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   data_efficiency_enabled ...... False
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   dataloader_drop_last ......... False
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   disable_allgather ............ False
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   dump_state ................... False
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   dynamic_loss_scale_args ...... None
+[2025-06-07 23:23:35,222] [INFO] [config.py:1007:print]   eigenvalue_enabled ........... False
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_gas_boundary_resolution  1
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_layer_name ........ bert.encoder.layer
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_layer_num ......... 0
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_max_iter .......... 100
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_stability ......... 1e-06
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_tol ............... 0.01
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   eigenvalue_verbose ........... False
+[2025-06-07 23:23:35,223] [INFO] [config.py:1007:print]   elasticity_enabled ........... False
+[2025-06-07 23:23:35,224] [INFO] [config.py:1007:print]   flops_profiler_config ........ {
+    "enabled": false, 
+    "recompute_fwd_factor": 0.0, 
+    "profile_step": 1, 
+    "module_depth": -1, 
+    "top_modules": 1, 
+    "detailed": true, 
+    "output_file": null
+}
+[2025-06-07 23:23:35,224] [INFO] [config.py:1007:print]   fp16_auto_cast ............... None
+[2025-06-07 23:23:35,224] [INFO] [config.py:1007:print]   fp16_enabled ................. False
+[2025-06-07 23:23:35,224] [INFO] [config.py:1007:print]   fp16_master_weights_and_gradients  False
+[2025-06-07 23:23:35,224] [INFO] [config.py:1007:print]   global_rank .................. 0
+[2025-06-07 23:23:35,224] [INFO] [config.py:1007:print]   grad_accum_dtype ............. None
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   gradient_accumulation_steps .. 2
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   gradient_clipping ............ 1.0
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   gradient_predivide_factor .... 1.0
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   graph_harvesting ............. False
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   hybrid_engine ................ enabled=False max_out_tokens=512 inference_tp_size=1 release_inference_cache=False pin_parameters=True tp_gather_partition_size=8
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   initial_dynamic_scale ........ 1
+[2025-06-07 23:23:35,225] [INFO] [config.py:1007:print]   load_universal_checkpoint .... False
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   loss_scale ................... 1.0
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   memory_breakdown ............. False
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   mics_hierarchial_params_gather  False
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   mics_shard_size .............. -1
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   monitor_config ............... tensorboard=TensorBoardConfig(enabled=False, output_path='', job_name='DeepSpeedJobName') comet=CometConfig(enabled=False, samples_log_interval=100, project=None, workspace=None, api_key=None, experiment_name=None, experiment_key=None, online=None, mode=None) wandb=WandbConfig(enabled=False, group=None, team=None, project='deepspeed') csv_monitor=CSVConfig(enabled=False, output_path='', job_name='DeepSpeedJobName')
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   nebula_config ................ {
+    "enabled": false, 
+    "persistent_storage_path": null, 
+    "persistent_time_interval": 100, 
+    "num_of_version_in_retention": 2, 
+    "enable_nebula_load": true, 
+    "load_path": null
+}
+[2025-06-07 23:23:35,226] [INFO] [config.py:1007:print]   optimizer_legacy_fusion ...... False
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   optimizer_name ............... None
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   optimizer_params ............. None
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   pipeline ..................... {'stages': 'auto', 'partition': 'best', 'seed_layers': False, 'activation_checkpoint_interval': 0, 'pipe_partitioned': True, 'grad_partitioned': True}
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   pld_enabled .................. False
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   pld_params ................... False
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   prescale_gradients ........... False
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   scheduler_name ............... None
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   scheduler_params ............. None
+[2025-06-07 23:23:35,227] [INFO] [config.py:1007:print]   seq_parallel_communication_data_type  torch.float32
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   sparse_attention ............. None
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   sparse_gradients_enabled ..... False
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   steps_per_print .............. inf
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   tensor_parallel_config ....... dtype=torch.float16 autotp_size=0 tp_overlap_comm=False tensor_parallel=TPConfig(tp_size=1, tp_grain_size=1, mpu=None, tp_group=None) injection_policy_tuple=None keep_module_on_host=False replace_with_kernel_inject=False
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   timers_config ................ enabled=True synchronized=True
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   train_batch_size ............. 16
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   train_micro_batch_size_per_gpu  8
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   use_data_before_expert_parallel_  False
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   use_node_local_storage ....... False
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   wall_clock_breakdown ......... False
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   weight_quantization_config ... None
+[2025-06-07 23:23:35,228] [INFO] [config.py:1007:print]   world_size ................... 1
+[2025-06-07 23:23:35,229] [INFO] [config.py:1007:print]   zero_allow_untested_optimizer  True
+[2025-06-07 23:23:35,229] [INFO] [config.py:1007:print]   zero_config .................. stage=3 contiguous_gradients=True reduce_scatter=True reduce_bucket_size=500000000 use_multi_rank_bucket_allreduce=True allgather_partitions=True allgather_bucket_size=500000000 overlap_comm=True load_from_fp32_weights=True elastic_checkpoint=False offload_param=DeepSpeedZeroOffloadParamConfig(device='cpu', nvme_path=None, buffer_count=5, buffer_size=100000000, max_in_cpu=1000000000, pin_memory=False) offload_optimizer=DeepSpeedZeroOffloadOptimizerConfig(device='cpu', nvme_path=None, buffer_count=4, pin_memory=False, pipeline_read=False, pipeline_write=False, fast_init=False, ratio=1.0) sub_group_size=1000000000 cpu_offload_param=None cpu_offload_use_pin_memory=None cpu_offload=None prefetch_bucket_size=50000000 param_persistence_threshold=100000 model_persistence_threshold=9223372036854775807 max_live_parameters=1000000000 max_reuse_distance=1000000000 gather_16bit_weights_on_model_save=True module_granularity_threshold=0 use_all_reduce_for_fetch_params=False stage3_gather_fp16_weights_on_model_save=False ignore_unused_parameters=True legacy_stage1=False round_robin_gradients=False zero_hpz_partition_size=1 zero_quantized_weights=False zero_quantized_nontrainable_weights=False zero_quantized_gradients=False zeropp_loco_param=None mics_shard_size=-1 mics_hierarchical_params_gather=False memory_efficient_linear=True pipeline_loading_checkpoint=False override_module_apply=True log_trace_cache_warnings=False
+[2025-06-07 23:23:35,229] [INFO] [config.py:1007:print]   zero_enabled ................. True
+[2025-06-07 23:23:35,229] [INFO] [config.py:1007:print]   zero_force_ds_cpu_optimizer .. True
+[2025-06-07 23:23:35,229] [INFO] [config.py:1007:print]   zero_optimization_stage ...... 3
+[2025-06-07 23:23:35,229] [INFO] [config.py:993:print_user_config]   json = {
+    "train_batch_size": 16, 
+    "train_micro_batch_size_per_gpu": 8, 
+    "gradient_accumulation_steps": 2, 
+    "zero_optimization": {
+        "stage": 3, 
+        "offload_optimizer": {
+            "device": "cpu", 
+            "nvme_path": null
+        }, 
+        "offload_param": {
+            "device": "cpu", 
+            "nvme_path": null
+        }, 
+        "stage3_gather_16bit_weights_on_model_save": true
+    }, 
+    "gradient_clipping": 1.0, 
+    "steps_per_print": inf, 
+    "bf16": {
+        "enabled": true
+    }, 
+    "fp16": {
+        "enabled": false
+    }, 
+    "zero_allow_untested_optimizer": true
+}
+23:23:36 | INFO | ***** Train Text-to-Motion *****
+Traceback (most recent call last):
+  File "/homes/55/junlin/MMaDA/training/train_t2m.py", line 517, in <module>
+    main()
+  File "/homes/55/junlin/MMaDA/training/train_t2m.py", line 439, in main
+    eval_trans.evaluation_mmada_t2m(
+AttributeError: module 'utils.eval_trans' has no attribute 'evaluation_mmada_t2m'
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/homes/55/junlin/MMaDA/training/train_t2m.py", line 517, in <module>
+[rank0]:     main()
+[rank0]:   File "/homes/55/junlin/MMaDA/training/train_t2m.py", line 439, in main
+[rank0]:     eval_trans.evaluation_mmada_t2m(
+[rank0]: AttributeError: module 'utils.eval_trans' has no attribute 'evaluation_mmada_t2m'
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mmmada-training-t2m-instruct[0m at: [34mhttps://wandb.ai/mercury-chang-ma-university-of-oxford/mmada-training-t2m/runs/h4kdi2yl[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20250607_232224-h4kdi2yl/logs[0m
+E0607 23:24:13.285000 20852 site-packages/torch/distributed/elastic/multiprocessing/api.py:874] failed (exitcode: 1) local_rank: 0 (pid: 21180) of binary: /homes/55/junlin/miniconda3/envs/mmada/bin/python3.10
+Warning: The cache directory for DeepSpeed Triton autotune, /homes/55/junlin/.triton/autotune, appears to be on an NFS system. While this is generally acceptable, if you experience slowdowns or hanging when DeepSpeed exits, it is recommended to set the TRITON_CACHE_DIR environment variable to a non-NFS path.
+Traceback (most recent call last):
+  File "/homes/55/junlin/miniconda3/envs/mmada/bin/accelerate", line 8, in <module>
+    sys.exit(main())
+  File "/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/accelerate/commands/accelerate_cli.py", line 50, in main
+    args.func(args)
+  File "/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/accelerate/commands/launch.py", line 1183, in launch_command
+    deepspeed_launcher(args)
+  File "/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/accelerate/commands/launch.py", line 868, in deepspeed_launcher
+    distrib_run.run(args)
+  File "/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/torch/distributed/run.py", line 883, in run
+    elastic_launch(
+  File "/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 139, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+  File "/homes/55/junlin/miniconda3/envs/mmada/lib/python3.10/site-packages/torch/distributed/launcher/api.py", line 270, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+training/train_t2m.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2025-06-07_23:24:13
+  host      : torrnode11.priv
+  rank      : 0 (local_rank: 0)
+  exitcode  : 1 (pid: 21180)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

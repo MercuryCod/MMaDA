@@ -271,13 +271,13 @@ def evaluation_transformer(out_dir, val_loader, net, trans, logger, writer, nb_i
         writer.add_scalar('./Test/matching_score', matching_score_pred, nb_iter)
 
     
-        if nb_iter % 10000 == 0 :
-        # if True:
+        # if nb_iter % 10000 == 0 :
+        if True:
             for ii in range(4):
                 tensorborad_add_video_xyz(writer, draw_org[ii], nb_iter, tag='./Vis/org_eval'+str(ii), nb_vis=1, title_batch=[draw_text[ii]], outname=[os.path.join(out_dir, 'gt'+str(ii)+'.gif')] if savegif else None)
             
-        if nb_iter % 10000 == 0 : 
-        # if True:
+        # if nb_iter % 10000 == 0 : 
+        if True:
             for ii in range(4):
                 tensorborad_add_video_xyz(writer, draw_pred[ii], nb_iter, tag='./Vis/pred_eval'+str(ii), nb_vis=1, title_batch=[draw_text_pred[ii]], outname=[os.path.join(out_dir, 'pred'+str(ii)+'.gif')] if savegif else None)
 
@@ -594,9 +594,9 @@ def calculate_frechet_feature_distance(feature_list1, feature_list2):
 def evaluation_mmada_t2m(
     out_dir,
     val_loader,
-    vq_model,
-    mmada_model,
-    uni_prompting,
+    vq_model,  # VQ-VAE for decoding motion tokens
+    mmada_model,  # MMada unified model
+    uni_prompting,  # UniversalPrompting system
     logger,
     writer,
     nb_iter,
@@ -608,277 +608,293 @@ def evaluation_mmada_t2m(
     best_top3,
     best_matching,
     eval_wrapper,
+    clip_model,  # CLIP model for text-motion alignment
     mask_token_id=126336,
     motion_vocab_size=512,
     motion_seq_len=256,
-    savegif=True,
+    draw=True,
+    save=True,
+    savegif=False,
+    savenpy=False,
 ):
     """
-    Evaluate text-to-motion generation with MMaDA model.
-    COMPLETE VERSION: With proper motion generation and GIF creation.
+    Evaluation function for MMaDA text-to-motion generation.
     """
-    print(f"========== Evaluating MMaDA T2M at iter {nb_iter} ==========")
-    
+    print(f"evaluation_mmada_t2m")
     mmada_model.eval()
-    
-    # Create output directory
-    os.makedirs(out_dir, exist_ok=True)
-    
-    # Collections for evaluation
-    motion_annotation_list = []
-    motion_pred_list = []
+    vq_model.eval()
+    clip_model.eval()
+    nb_sample = 0
+
     draw_org = []
     draw_pred = []
     draw_text = []
-    
-    # Evaluation counters
+    draw_text_pred = []
+
+    motion_annotation_list = []
+    motion_pred_list = []
     R_precision_real = 0
     R_precision = 0
     matching_score_real = 0
     matching_score_pred = 0
-    nb_sample = 0
-    
-    # Use a reasonable subset for evaluation
-    max_samples = 64
-    sample_count = 0
-    
-    try:
+
+    logger.info(f"Starting evaluation with motion_vocab_size={motion_vocab_size}")
+
+    for i in range(1):
         for batch in val_loader:
-            if sample_count >= max_samples:
-                break
+            (
+                word_embeddings,
+                pos_one_hots,
+                clip_text,
+                sent_len,
+                pose,
+                m_length,
+                token,
+                name,
+            ) = batch
+
+            bs, seq = pose.shape[:2]
+            num_joints = 21 if pose.shape[-1] == 251 else 22
+
+            try:
+                # Generate motion tokens
+                dummy_motion_tokens = torch.full(
+                    (bs, motion_seq_len), mask_token_id, dtype=torch.long, device=mmada_model.device
+                )
+                input_ids, attention_mask, _ = uni_prompting(
+                    (list(clip_text), dummy_motion_tokens, dummy_motion_tokens), "t2m"
+                )
+                input_ids, attention_mask = input_ids.to(mmada_model.device), attention_mask.to(mmada_model.device)
                 
-            # Unpack validation batch
-            (word_embeddings, pos_one_hots, clip_text, sent_len, motion, m_length, token, name) = batch
-            batch_size = len(clip_text)
-            
-            # Move to device
-            motion = motion.cuda().float()
-            
-            # Determine number of joints from motion dimension
-            num_joints = 21 if motion.shape[-1] == 251 else 22
-            
-            # Process ground truth motions for visualization and evaluation
-            motion_pred_eval = torch.zeros_like(motion).cuda()
-            pred_lengths = torch.zeros(batch_size, dtype=torch.long).cuda()
-            
-            for i in range(batch_size):
+                generated = mmada_model.t2m_generate(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    seq_len=motion_seq_len,
+                    mask_token_id=mask_token_id,
+                    motion_vocab_size=motion_vocab_size,
+                    uni_prompting=uni_prompting,
+                    temperature=1.0,
+                    timesteps=18,
+                )
+                
+                # Generated tokens are already in VQ-VAE space [0, 511]
+                vq_indices = torch.clamp(generated, 0, motion_vocab_size - 1).long()
+                
+                # Decode motion from VQ-VAE
+                pred_pose = vq_model.forward_decoder(vq_indices)
+                pred_len = torch.full((bs,), pred_pose.shape[1], dtype=torch.long, device=mmada_model.device)
+                
+            except Exception as e:
+                logger.error(f"Generation failed: {e}")
+                # Create dummy predictions if generation fails
+                pred_pose = torch.zeros((bs, motion_seq_len, pose.shape[-1]), device=mmada_model.device)
+                pred_len = torch.full((bs,), motion_seq_len, dtype=torch.long, device=mmada_model.device)
+
+            if draw or savenpy:
                 try:
-                    # Create input for generation
-                    # Use proper mask tokens in offset space for generation
-                    dummy_motion_tokens = torch.full((motion_seq_len,), mask_token_id, dtype=torch.long, device=motion.device)
-                    
-                    # Apply vocabulary offset to match training approach
-                    # Note: This creates input in the expected format for MMaDA
-                    offset_dummy_tokens = torch.zeros((motion_seq_len,), dtype=torch.long, device=motion.device) + len(uni_prompting.text_tokenizer)
-                    input_ids, attention_mask, _ = uni_prompting(([clip_text[i]], offset_dummy_tokens.unsqueeze(0), offset_dummy_tokens.unsqueeze(0)), 't2m')
-                    
-                    # Set motion tokens to mask tokens for generation
-                    som_token = int(uni_prompting.sptids_dict["<|som|>"])
-                    eom_token = int(uni_prompting.sptids_dict["<|eom|>"])
-                    som_pos = (input_ids[0] == som_token).nonzero(as_tuple=True)[0]
-                    eom_pos = (input_ids[0] == eom_token).nonzero(as_tuple=True)[0]
-                    
-                    if len(som_pos) > 0 and len(eom_pos) > 0:
-                        motion_start_idx = som_pos[0].item() + 1
-                        motion_end_idx = eom_pos[0].item()
-                        input_ids[0, motion_start_idx:motion_end_idx] = mask_token_id
-                    
-                    input_ids = input_ids.cuda()
-                    attention_mask = attention_mask.cuda() if attention_mask is not None else None
-                    
-                    # OPTIMIZATION 4: Reduce generation timesteps for speed
-                    try:
-                        generated_tokens = mmada_model.t2m_generate(
-                            input_ids=input_ids,
-                            attention_mask=attention_mask,
-                            uni_prompting=uni_prompting,
-                            mask_token_id=mask_token_id,
-                            motion_vocab_size=motion_vocab_size,
-                            seq_len=motion_seq_len,
-                            timesteps=8,  # Reduced for faster evaluation
+                    pred_denorm = val_loader.dataset.inv_transform(
+                        pred_pose.detach().cpu().numpy()
+                    )
+                    pred_xyz_batch = recover_from_ric(
+                        torch.from_numpy(pred_denorm).float().cuda(), num_joints
+                    )
+
+                    for j in range(bs):
+                        if savenpy:
+                            np.save(
+                                os.path.join(out_dir, name[j] + "_pred.npy"),
+                                pred_xyz_batch[j:j+1].detach().cpu().numpy(),
+                            )
+
+                        if draw and i == 0 and j < 4:
+                            draw_pred.append(pred_xyz_batch[j:j+1])
+                            draw_text_pred.append(clip_text[j])
+                except Exception as e:
+                    logger.warning(f"Visualization failed: {e}")
+
+            # Process embeddings with proper error handling
+            try:
+                et_pred, em_pred = eval_wrapper.get_co_embeddings(
+                    word_embeddings, pos_one_hots, sent_len, pred_pose, pred_len
+                )
+            except Exception as e:
+                logger.warning(f"Embedding extraction failed: {e}")
+                # Create dummy embeddings if extraction fails
+                et_pred = torch.zeros(bs, 512).to(word_embeddings.device)
+                em_pred = torch.zeros(bs, 512).to(word_embeddings.device)
+
+            if i == 0:
+                try:
+                    pose = pose.cuda().float()
+                    et, em = eval_wrapper.get_co_embeddings(
+                        word_embeddings, pos_one_hots, sent_len, pose, m_length
+                    )
+                    motion_annotation_list.append(em)
+                    motion_pred_list.append(em_pred)
+
+                    if draw or savenpy:
+                        pose_denorm = val_loader.dataset.inv_transform(
+                            pose.detach().cpu().numpy()
                         )
-                        
-                        # Ensure tokens are in valid VQ-VAE range
-                        generated_tokens = torch.clamp(generated_tokens[0], 0, motion_vocab_size - 1)
-                        
-                        # Decode using VQ-VAE
-                        decoded_motion = vq_model.forward_decoder(generated_tokens.unsqueeze(0))
-                        decoded_motion = decoded_motion.squeeze(0)
-                        
-                        # Store for evaluation
-                        actual_length = min(decoded_motion.shape[0], motion.shape[1])
-                        motion_pred_eval[i, :actual_length] = decoded_motion[:actual_length]
-                        pred_lengths[i] = actual_length
-                        
-                        
-                        
-                    except Exception as gen_error:
-                        print(f"⚠️  Generation failed for sample {i}: {gen_error}")
-                        # Use ground truth as fallback
-                        motion_pred_eval[i, :m_length[i]] = motion[i, :m_length[i]]
-                        pred_lengths[i] = m_length[i]
-                
-                except Exception as sample_error:
-                    print(f"⚠️  Sample processing failed for {i}: {sample_error}")
-                    # Use ground truth as fallback
-                    motion_pred_eval[i, :m_length[i]] = motion[i, :m_length[i]]
-                    pred_lengths[i] = m_length[i]
-            
-            # Get motion embeddings for evaluation (only for processed samples)
-            try:
-                et, em = eval_wrapper.get_co_embeddings(word_embeddings, pos_one_hots, sent_len, motion, m_length)
-                et_pred, em_pred = eval_wrapper.get_co_embeddings(word_embeddings, pos_one_hots, sent_len, motion_pred_eval, pred_lengths)
-                
-                motion_annotation_list.append(em)
-                motion_pred_list.append(em_pred)
-                
-                # Calculate R-precision for this batch
-                temp_R, temp_match = calculate_R_precision(et.cpu().numpy(), em.cpu().numpy(), top_k=3, sum_all=True)
-                R_precision_real += temp_R
-                matching_score_real += temp_match
-                temp_R, temp_match = calculate_R_precision(et_pred.cpu().numpy(), em_pred.cpu().numpy(), top_k=3, sum_all=True)
-                R_precision += temp_R
-                matching_score_pred += temp_match
-                
-            except Exception as eval_error:
-                print(f"⚠️  Embedding evaluation failed: {eval_error}")
-            
-            # Prepare motions for visualization
-            if savegif and len(draw_org) < 4:  # Only visualize first 4 samples
-                try:
-                    # Process ground truth motions
-                    gt_denorm = val_loader.dataset.inv_transform(motion.detach().cpu().numpy())
-                    gt_xyz = recover_from_ric(torch.from_numpy(gt_denorm).float().cuda(), num_joints)
-                    
-                    # Process predicted motions  
-                    pred_denorm = val_loader.dataset.inv_transform(motion_pred_eval.detach().cpu().numpy())
-                    pred_xyz = recover_from_ric(torch.from_numpy(pred_denorm).float().cuda(), num_joints)
-                    
-                    # Collect samples for visualization
-                    for j in range(min(4 - len(draw_org), batch_size)):
-                        draw_org.append(gt_xyz[j:j+1, :m_length[j]])
-                        draw_pred.append(pred_xyz[j:j+1, :pred_lengths[j]])
-                        draw_text.append(clip_text[j])
-                        
-                except Exception as viz_error:
-                    print(f"⚠️  Visualization preparation failed: {viz_error}")
-            
-            sample_count += batch_size
-            nb_sample += batch_size
-            
-        # Calculate final metrics
-        if len(motion_annotation_list) > 0 and len(motion_pred_list) > 0:
-            motion_annotation_np = torch.cat(motion_annotation_list, dim=0).cpu().numpy()
-            motion_pred_np = torch.cat(motion_pred_list, dim=0).cpu().numpy()
-            
-            gt_mu, gt_cov = calculate_activation_statistics(motion_annotation_np)
-            pred_mu, pred_cov = calculate_activation_statistics(motion_pred_np)
-            
-            fid = calculate_frechet_distance(gt_mu, gt_cov, pred_mu, pred_cov)
-            diversity_real = calculate_diversity(motion_annotation_np, min(300, motion_annotation_np.shape[0]//2))
-            diversity = calculate_diversity(motion_pred_np, min(300, motion_pred_np.shape[0]//2))
-            
-            R_precision_real = R_precision_real / nb_sample
-            R_precision = R_precision / nb_sample
-            matching_score_real = matching_score_real / nb_sample
-            matching_score_pred = matching_score_pred / nb_sample
-            
-        else:
-            print("⚠️  No valid samples for metric calculation, using dummy values")
-            fid, diversity, R_precision = 100.0, 0.0, [0.0, 0.0, 0.0]
-            matching_score_pred = 100.0
-        
-        # Generate motion GIFs
-        if savegif and len(draw_org) > 0 and nb_iter % 10000 == 0 :
-            try:
-                print(f"🎬 Generating motion GIFs...")
-                
-                # Create GIFs for ground truth and predicted motions
-                for ii in range(len(draw_org)):
-                    # Ground truth GIF
-                    gif_path_gt = os.path.join(out_dir, f'mmada_t2m_gt_{ii}_iter_{nb_iter}.gif')
-                    tensorborad_add_video_xyz(
-                        writer, draw_org[ii], nb_iter, 
-                        tag=f'./MMaDA_T2M/gt_eval_{ii}', 
-                        nb_vis=1, 
-                        title_batch=[f"GT: {draw_text[ii]}"], 
-                        outname=[gif_path_gt]
+                        pose_xyz = recover_from_ric(
+                            torch.from_numpy(pose_denorm).float().cuda(), num_joints
+                        )
+
+                        if savenpy:
+                            for j in range(bs):
+                                np.save(
+                                    os.path.join(out_dir, name[j] + "_gt.npy"),
+                                    pose_xyz[j][: m_length[j]]
+                                    .unsqueeze(0)
+                                    .cpu()
+                                    .numpy(),
+                                )
+
+                        if draw:
+                            for j in range(min(4, bs)):
+                                draw_org.append(pose_xyz[j][: m_length[j]].unsqueeze(0))
+                                draw_text.append(clip_text[j])
+
+                    temp_R, temp_match = calculate_R_precision(
+                        et.cpu().numpy(), em.cpu().numpy(), top_k=3, sum_all=True
                     )
-                    
-                    # Predicted motion GIF
-                    gif_path_pred = os.path.join(out_dir, f'mmada_t2m_pred_{ii}_iter_{nb_iter}.gif')
-                    tensorborad_add_video_xyz(
-                        writer, draw_pred[ii], nb_iter, 
-                        tag=f'./MMaDA_T2M/pred_eval_{ii}', 
-                        nb_vis=1, 
-                        title_batch=[f"Pred: {draw_text[ii]}"], 
-                        outname=[gif_path_pred]
+                    R_precision_real += temp_R
+                    matching_score_real += temp_match
+                    temp_R, temp_match = calculate_R_precision(
+                        et_pred.cpu().numpy(),
+                        em_pred.cpu().numpy(),
+                        top_k=3,
+                        sum_all=True,
                     )
-                    
-                    print(f"📹 Generated GIFs: {gif_path_gt}, {gif_path_pred}")
-                
-                print(f"✅ Generated {len(draw_org)} motion GIF pairs")
-                
-            except Exception as gif_error:
-                print(f"⚠️  GIF generation failed: {gif_error}")
-        
-        # FIXED: Proper best metrics tracking and logging
-        if fid < best_fid:
-            msg = f"--> --> \t FID Improved from {best_fid:.5f} to {fid:.5f} !!!"
-            logger.info(msg)
-            best_fid, best_iter = fid, nb_iter
-            print(f"🎉 NEW BEST FID: {fid:.5f} at iteration {nb_iter}")
-        
-        if abs(diversity_real - diversity) < abs(diversity_real - best_div):
-            msg = f"--> --> \t Diversity Improved from {best_div:.5f} to {diversity:.5f} !!!"
-            logger.info(msg)
-            best_div = diversity
-            print(f"🎉 NEW BEST DIVERSITY: {diversity:.5f}")
-        
-        if R_precision[0] > best_top1:
-            msg = f"--> --> \t Top1 Improved from {best_top1:.4f} to {R_precision[0]:.4f} !!!"
-            logger.info(msg)
-            best_top1 = R_precision[0]
-            print(f"🎉 NEW BEST TOP1: {R_precision[0]:.4f}")
-        
-        if R_precision[1] > best_top2:
-            msg = f"--> --> \t Top2 Improved from {best_top2:.4f} to {R_precision[1]:.4f} !!!"
-            logger.info(msg)
-            best_top2 = R_precision[1]
-            print(f"🎉 NEW BEST TOP2: {R_precision[1]:.4f}")
-        
-        if R_precision[2] > best_top3:
-            msg = f"--> --> \t Top3 Improved from {best_top3:.4f} to {R_precision[2]:.4f} !!!"
-            logger.info(msg)
-            best_top3 = R_precision[2]
-            print(f"🎉 NEW BEST TOP3: {R_precision[2]:.4f}")
-        
-        if matching_score_pred < best_matching:
-            msg = f"--> --> \t Matching Score Improved from {best_matching:.5f} to {matching_score_pred:.5f} !!!"
-            logger.info(msg)
-            best_matching = matching_score_pred
-            print(f"🎉 NEW BEST MATCHING: {matching_score_pred:.5f}")
-        
-        # Log results
-        msg = f"--> MMaDA T2M Eval. Iter {nb_iter}: FID {fid:.4f}, Diversity {diversity:.4f}, R-precision {R_precision}, Matching {matching_score_pred:.4f}"
+                    R_precision += temp_R
+                    matching_score_pred += temp_match
+
+                    nb_sample += bs
+                except Exception as e:
+                    logger.warning(f"Ground truth processing failed: {e}")
+
+    # Handle empty lists
+    if len(motion_annotation_list) == 0 or len(motion_pred_list) == 0:
+        logger.warning("No valid samples processed, returning default metrics")
+        return 1000.0, 0.0, 0.0, 0.0, 0.0, 1000.0
+
+    motion_annotation_np = torch.cat(motion_annotation_list, dim=0).cpu().numpy()
+    motion_pred_np = torch.cat(motion_pred_list, dim=0).cpu().numpy()
+    gt_mu, gt_cov = calculate_activation_statistics(motion_annotation_np)
+    mu, cov = calculate_activation_statistics(motion_pred_np)
+
+    diversity_real = calculate_diversity(
+        motion_annotation_np, 300 if nb_sample > 300 else 100
+    )
+    diversity = calculate_diversity(motion_pred_np, 300 if nb_sample > 300 else 100)
+
+    R_precision_real = R_precision_real / nb_sample if nb_sample > 0 else [0, 0, 0]
+    R_precision = R_precision / nb_sample if nb_sample > 0 else [0, 0, 0]
+
+    matching_score_real = matching_score_real / nb_sample if nb_sample > 0 else 0
+    matching_score_pred = matching_score_pred / nb_sample if nb_sample > 0 else 0
+
+    fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
+
+    msg = f"--> \t Eva. Iter {nb_iter} :, FID. {fid:.4f}, Diversity Real. {diversity_real:.4f}, Diversity. {diversity:.4f}, R_precision_real. {R_precision_real}, R_precision. {R_precision}, matching_score_real. {matching_score_real}, matching_score_pred. {matching_score_pred}"
+    logger.info(msg)
+
+    if draw:
+        writer.add_scalar("./Test/FID", fid, nb_iter)
+        writer.add_scalar("./Test/Diversity", diversity, nb_iter)
+        writer.add_scalar("./Test/top1", R_precision[0], nb_iter)
+        writer.add_scalar("./Test/top2", R_precision[1], nb_iter)
+        writer.add_scalar("./Test/top3", R_precision[2], nb_iter)
+        writer.add_scalar("./Test/matching_score", matching_score_pred, nb_iter)
+
+        if True:
+            for ii in range(min(4, len(draw_org))):
+                tensorborad_add_video_xyz(
+                    writer,
+                    draw_org[ii],
+                    nb_iter,
+                    tag="./Vis/org_eval" + str(ii),
+                    nb_vis=1,
+                    title_batch=[draw_text[ii]],
+                    outname=(
+                        [os.path.join(out_dir, "gt" + str(ii) + ".gif")]
+                        if savegif
+                        else None
+                    ),
+                )
+
+            for ii in range(min(4, len(draw_pred))):
+                tensorborad_add_video_xyz(
+                    writer,
+                    draw_pred[ii],
+                    nb_iter,
+                    tag="./Vis/pred_eval" + str(ii),
+                    nb_vis=1,
+                    title_batch=[draw_text_pred[ii]],
+                    outname=(
+                        [os.path.join(out_dir, "pred" + str(ii) + ".gif")]
+                        if savegif
+                        else None
+                    ),
+                )
+
+    if fid < best_fid:
+        msg = f"--> --> \t FID Improved from {best_fid:.5f} to {fid:.5f} !!!"
         logger.info(msg)
-        
-        print(f"📊 Evaluation Results:")
-        print(f"   FID: {fid:.3f} (Best: {best_fid:.3f})")
-        print(f"   Diversity: {diversity:.3f} (Best: {best_div:.3f})")
-        print(f"   R-precision: {R_precision} (Best: [{best_top1:.3f}, {best_top2:.3f}, {best_top3:.3f}])")
-        print(f"   Matching Score: {matching_score_pred:.3f} (Best: {best_matching:.3f})")
-        print(f"   Samples Evaluated: {nb_sample}")
-        
-        # FIXED: Return updated best metrics like other evaluation functions
-        return best_fid, best_iter, best_div, best_top1, best_top2, best_top3, best_matching
-        
-    except Exception as eval_error:
-        print(f"❌ Evaluation failed: {eval_error}")
-        import traceback
-        traceback.print_exc()
-        # FIXED: Return correct number of values matching the new signature
-        return best_fid, best_iter, best_div, best_top1, best_top2, best_top3, best_matching
+        best_fid, best_iter = fid, nb_iter
+        if save:
+            torch.save(
+                {"mmada_model": mmada_model.state_dict()},
+                os.path.join(out_dir, "net_best_fid.pth"),
+            )
+
+    if matching_score_pred < best_matching:
+        msg = f"--> --> \t matching_score Improved from {best_matching:.5f} to {matching_score_pred:.5f} !!!"
+        logger.info(msg)
+        best_matching = matching_score_pred
+
+    if abs(diversity_real - diversity) < abs(diversity_real - best_div):
+        msg = (
+            f"--> --> \t Diversity Improved from {best_div:.5f} to {diversity:.5f} !!!"
+        )
+        logger.info(msg)
+        best_div = diversity
+
+    if R_precision[0] > best_top1:
+        msg = (
+            f"--> --> \t Top1 Improved from {best_top1:.4f} to {R_precision[0]:.4f} !!!"
+        )
+        logger.info(msg)
+        best_top1 = R_precision[0]
+
+    if R_precision[1] > best_top2:
+        msg = (
+            f"--> --> \t Top2 Improved from {best_top2:.4f} to {R_precision[1]:.4f} !!!"
+        )
+        logger.info(msg)
+        best_top2 = R_precision[1]
+
+    if R_precision[2] > best_top3:
+        msg = (
+            f"--> --> \t Top3 Improved from {best_top3:.4f} to {R_precision[2]:.4f} !!!"
+        )
+        logger.info(msg)
+        best_top3 = R_precision[2]
+
+    if save:
+        torch.save(
+            {"mmada_model": mmada_model.state_dict()},
+            os.path.join(out_dir, "net_last.pth"),
+        )
+
+    mmada_model.train()
     
-    finally:
-        mmada_model.train()
+    print(f"evaluation_mmada_t2m end")
+    return (
+        fid,
+        diversity,
+        R_precision[0],
+        R_precision[1],
+        R_precision[2],
+        matching_score_pred,
+    )

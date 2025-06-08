@@ -8,9 +8,9 @@ experiment:
     name: "mmada-training-t2m-instruct"
     output_dir: "mmada-training-t2m-instruct"
     save_every: 10
-    eval_every: 10
+    eval_every: 5
     generate_every: 10
-    log_every: 1
+    log_every: 5
     log_grad_norm_every: 100
     resume_from_checkpoint: "latest"
     val_every: 50
@@ -56,6 +56,7 @@ dataset:
         resolution: 256
         center_crop: False
         random_flip: False
+        max_motion_length: 256
 
 optimizer:
     name: adamw
