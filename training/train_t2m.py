@@ -33,6 +33,7 @@ import clip
 from os.path import join as pjoin
 import torch.nn.functional as F
 import random
+from peft import LoraConfig, get_peft_model, TaskType, PeftModel
 
 # ---------------------------------------------------------------------
 # project imports

@@ -261,3 +261,7 @@ parquet/processed/
 run_*.sh
 temp_*.py
 test_*.py
+
+
+# Training checkpoints
+mmada-training-t2m-instruct-lora/

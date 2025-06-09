@@ -21,7 +21,9 @@ from typing import Optional, Union
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LambdaLR
 
-from .logging import get_logger
+from transformers import get_scheduler as get_transformers_scheduler
+
+from .mmada_logging import get_logger
 
 logger = get_logger(__name__)
 

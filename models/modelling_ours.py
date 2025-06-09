@@ -103,10 +103,10 @@ class MMadaConfig(PretrainedConfig):
             if key in kwargs:
                 setattr(self, key, kwargs[key])
         
-        # Calculate total vocabulary size if not explicitly set
+        # Only calculate total vocabulary size if neither vocab_size nor new_vocab_size is explicitly set
         if not hasattr(self, 'vocab_size') and not hasattr(self, 'new_vocab_size'):
             llm_vocab_size = getattr(self, 'llm_vocab_size', 126000)
-            image_codebook_size = getattr(self, 'codebook_size', 8192)  # or image_codebook_size
+            image_codebook_size = getattr(self, 'codebook_size', 8192)
             motion_vocab_size = getattr(self, 'motion_vocab_size', 512)
             num_special_tokens = getattr(self, 'num_new_special_tokens', 10)
             buffer_size = 100  # Safety buffer
@@ -121,6 +121,15 @@ class MMadaConfig(PretrainedConfig):
             print(f"  - Motion vocab: {motion_vocab_size}")
             print(f"  - Special tokens: {num_special_tokens}")
             print(f"  - Buffer: {buffer_size}")
+        else:
+            # If vocab_size or new_vocab_size was provided, ensure both are set to the same value
+            if hasattr(self, 'new_vocab_size') and not hasattr(self, 'vocab_size'):
+                self.vocab_size = self.new_vocab_size
+            elif hasattr(self, 'vocab_size') and not hasattr(self, 'new_vocab_size'):
+                self.new_vocab_size = self.vocab_size
+            # Also update embedding_size if needed
+            if hasattr(self, 'vocab_size'):
+                self.embedding_size = self.vocab_size
 
 
 
@@ -137,22 +146,22 @@ class MMadaModelLM(LLaDAModelLM):
 
     def _get_vocab_size(self):
         """Get the vocabulary size from config or model"""
-        vocab_size = getattr(self.config, 'vocab_size', None) or getattr(self.config, 'new_vocab_size', None)
+        # First try to get new_vocab_size from config (this is what we set in training)
+        vocab_size = getattr(self.config, 'new_vocab_size', None)
+        
+        # If not found, try vocab_size
         if vocab_size is None:
-            # Try to get vocab size from the model's embedding layer
-            if hasattr(self, 'model') and hasattr(self.model, 'embed_tokens'):
-                vocab_size = self.model.embed_tokens.num_embeddings
-            else:
-                # Calculate required vocab size based on token types
-                # Text tokens + Image tokens + Motion tokens + Special tokens + Buffer
-                text_vocab_size = getattr(self.config, 'llm_vocab_size', 126000)
-                image_codebook_size = getattr(self.config, 'codebook_size', 8192)
-                motion_vocab_size = 512  # Typical motion codebook size
-                num_special_tokens = getattr(self.config, 'num_new_special_tokens', 10)
-                buffer_size = 100  # Small buffer for safety
-                
-                vocab_size = text_vocab_size + image_codebook_size + motion_vocab_size + num_special_tokens + buffer_size
-                print(f"Calculated vocab_size: {vocab_size} (text: {text_vocab_size}, image: {image_codebook_size}, motion: {motion_vocab_size}, special: {num_special_tokens}, buffer: {buffer_size})")
+            vocab_size = getattr(self.config, 'vocab_size', None)
+        
+        # If still not found, try to get from embeddings
+        if vocab_size is None and hasattr(self, 'model') and hasattr(self.model, 'embed_tokens'):
+            vocab_size = self.model.embed_tokens.num_embeddings
+            
+        # If all else fails, use the expected value
+        if vocab_size is None:
+            vocab_size = 135055  # Our expected total: text (126349) + image (8192) + motion (512) + special (2)
+            print(f"WARNING: Could not determine vocab_size from config, using default: {vocab_size}")
+            
         return vocab_size
 
     def _validate_token_ids(self, input_ids, labels=None, mask_token_id=None):
