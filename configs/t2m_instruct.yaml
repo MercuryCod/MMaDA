@@ -36,16 +36,14 @@ model:
         mu: 0.99
         resume_pth: "output/VQVAE/net_last.pth"
 
-    motion_vq_model:
-
     mmada:
         tokenizer_path: "GSAI-ML/LLaDA-8B-Instruct"
         pretrained_model_path: "Gen-Verse/MMaDA-8B-MixCoT"
         w_clip_vit: False
-        new_vocab_size: 135168
+        new_vocab_size: 135055  # Fixed: text (126349) + image (8192) + motion (512) + EOM (1) + PAD (1)
         llm_vocab_size: 126464
-        motion_codebook_size: 512
         image_codebook_size: 8192
+        motion_codebook_size: 512
         num_vq_tokens: 256
         num_new_special_tokens: 0
         tie_word_embeddings: False

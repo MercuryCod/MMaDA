@@ -133,10 +133,11 @@ def mask_or_random_replace_tokens_motion(
         motion_token_end = motion_token_start + motion_vocab_size
         
         # CRITICAL: Only replace with actual motion codes, not special tokens
-        # Generate random tokens only in the actual motion code range
+        # Generate random tokens only in the actual motion code range [0-511]
+        # which maps to [motion_token_start, motion_token_start + 512) in vocabulary space
         random_tokens = torch.randint(
             low=motion_token_start, 
-            high=motion_token_end,  # This ensures we only get codes 0-511 in offset space
+            high=motion_token_start + motion_vocab_size,  # This ensures we only get codes 0-511 in offset space
             size=motion_tokens.shape, 
             device=motion_tokens.device
         )
@@ -162,11 +163,20 @@ def mask_or_random_replace_tokens_motion(
 def save_checkpoint(model, accel: Accelerator, config, gstep: int):
     """
     Save a sharded / fp16-safe checkpoint that can be resumed later.
+    
+    Args:
+        gstep: Can be an integer step number or a string like "best-100"
     """
     out_dir = Path(config.experiment.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    ckpt_dir = out_dir / f"checkpoint-{gstep}"
-    ckpt_dir.mkdir(exist_ok=True)
+    
+    # Handle both integer steps and special checkpoint names
+    if isinstance(gstep, str):
+        ckpt_dir = out_dir / f"checkpoint-{gstep}"
+    else:
+        ckpt_dir = out_dir / f"checkpoint-{gstep}"
+    
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     state_dict = accel.get_state_dict(model)
     if accel.is_main_process:
@@ -180,19 +190,28 @@ def save_checkpoint(model, accel: Accelerator, config, gstep: int):
         logger.info(f"✔ saved checkpoint to {ckpt_dir}")
 
 
-def validate_vocabulary_config(text_vocab_size: int, image_codebook_size: int, motion_vocab_size: int, expected_total: int):
+def validate_vocabulary_config(text_vocab_size: int, image_codebook_size: int, motion_vocab_size_with_special: int, expected_total: int):
     """
     Validate that vocabulary configuration is consistent.
+    
+    Args:
+        text_vocab_size: Size of text vocabulary (includes text special tokens)
+        image_codebook_size: Size of image codebook
+        motion_vocab_size_with_special: Motion vocab (512) + EOM (1) + PAD (1) = 514
+        expected_total: Expected total vocabulary size
     """
-    calculated_total = text_vocab_size + image_codebook_size + motion_vocab_size
+    calculated_total = text_vocab_size + image_codebook_size + motion_vocab_size_with_special
     if calculated_total != expected_total:
         raise ValueError(
             f"Vocabulary size mismatch! "
-            f"Calculated: {calculated_total} (text: {text_vocab_size} + image: {image_codebook_size} + motion: {motion_vocab_size}) "
+            f"Calculated: {calculated_total} (text: {text_vocab_size} + image: {image_codebook_size} + motion: {motion_vocab_size_with_special}) "
             f"vs Expected: {expected_total}"
         )
     
     logger.info(f"✅ Vocabulary validation passed: {calculated_total} tokens total")
+    logger.info(f"   Text vocabulary (with special tokens): {text_vocab_size}")
+    logger.info(f"   Image codebook: {image_codebook_size}")
+    logger.info(f"   Motion vocabulary (512 codes + 2 special): {motion_vocab_size_with_special}")
     return True
 
 
@@ -331,10 +350,6 @@ def main():
     ckpt = torch.load(config.model.motion_vq_model.resume_pth, map_location='cpu')
     vq_model.load_state_dict(ckpt['net'], strict=True)
 
-    nb_iter, avg_loss_cls, avg_acc = 0, 0.0, 0.0
-    right_num = 0
-    nb_sample_train = 0
-    
     train_loader = dataset_TM_train.DATALoader(
         config.dataset.params.dataset_name,
         config.training.batch_size_t2m,
@@ -377,11 +392,12 @@ def main():
     image_codebook_size = config.model.mmada.image_codebook_size
     motion_vocab_size = config.model.motion_vq_model.nb_code
     
-    logger.info(f"Vocabulary: Text={text_vocab_size}, Image={image_codebook_size}, Motion={motion_vocab_size}, Total={text_vocab_size + image_codebook_size + motion_vocab_size}")
+    logger.info(f"Vocabulary: Text={text_vocab_size}, Image={image_codebook_size}, Motion={motion_vocab_size}, EOM+PAD=2, Total={text_vocab_size + image_codebook_size + motion_vocab_size + 2}")
     
-    # FIXED: Validate vocabulary configuration
+    # FIXED: Validate vocabulary configuration including special tokens
+    # The total should include text + image + motion + EOM + PAD
     validate_vocabulary_config(
-        text_vocab_size, image_codebook_size, motion_vocab_size, 
+        text_vocab_size, image_codebook_size, motion_vocab_size + 2,  # +2 for EOM and PAD
         config.model.mmada.new_vocab_size
     )
 
@@ -398,6 +414,15 @@ def main():
         model.config.embedding_size = mmada_config.new_vocab_size
     
     model = model.to(accelerator.device)
+
+    # Enable gradient checkpointing if configured
+    if config.model.get('gradient_checkpointing', False):
+        try:
+            model.gradient_checkpointing_enable()
+            logger.info("✅ Gradient checkpointing enabled")
+        except (ValueError, NotImplementedError) as e:
+            logger.warning(f"⚠️  Gradient checkpointing not supported by {model.__class__.__name__}: {e}")
+            logger.info("   Continuing training without gradient checkpointing")
 
     # ids we'll need
     mask_id = model.config.mask_token_id
@@ -463,10 +488,8 @@ def main():
     model, optimizer, lr_scheduler = accelerator.prepare(model, optimizer, lr_scheduler)
 
     # ============== training loop ==============
-    steps_per_epoch = math.ceil(
-        len(train_loader) / config.training.gradient_accumulation_steps
-    )
-    num_epochs = math.ceil(config.training.max_train_steps / steps_per_epoch)
+    steps_per_epoch = len(train_loader)
+    num_epochs = math.ceil(config.training.max_train_steps / (steps_per_epoch // config.training.gradient_accumulation_steps))
 
     batch_t = AverageMeter()
     end = time.time()
@@ -486,18 +509,39 @@ def main():
     logger.info(f"Steps per epoch: {steps_per_epoch}")
     logger.info(f"Total epochs: {num_epochs}")
     
+    # Debug: Log vocabulary ranges
+    logger.info(f"📊 Vocabulary ranges:")
+    logger.info(f"   Text tokens: [0, {text_vocab_size-1}]")
+    logger.info(f"   Image tokens: [{text_vocab_size}, {text_vocab_size + image_codebook_size - 1}]")
+    logger.info(f"   Motion tokens: [{text_vocab_size + image_codebook_size}, {text_vocab_size + image_codebook_size + motion_vocab_size - 1}]")
+    logger.info(f"   EOM token: {text_vocab_size + image_codebook_size + motion_vocab_size}")
+    logger.info(f"   PAD token: {text_vocab_size + image_codebook_size + motion_vocab_size + 1}")
+    logger.info(f"   Mask token ID: {mask_id}")
+    
     try:
         first_batch = True  # DEBUG flag
         for epoch in range(num_epochs):
             model.train()
             
             for batch in train_loader:
+                # Initialize sync_gradients flag at the start of each batch
+                sync_gradients = False
+                
+                # Initialize variables that are used in logging to avoid undefined errors
+                unscaled_loss = 0.0
+                mprob = torch.tensor([0.0], device=accelerator.device)
+                
                 try:
                     captions, m_tokens, m_tokens_len = batch
                     
                     # Move to accelerator device (consistent device placement)
                     m_tokens = m_tokens.to(accelerator.device).long()  # (B, T)
                     m_tokens_len = m_tokens_len.to(accelerator.device)
+                    
+                    # Store current batch info for later use in validation
+                    current_batch_size = m_tokens.shape[0]
+                    current_motion_seq_len = m_tokens.shape[1]
+                    current_captions = captions
                     
                     # CRITICAL FIX: Apply vocabulary offset to motion tokens ONCE
                     # Motion tokens need to be offset to their vocabulary range
@@ -509,9 +553,25 @@ def main():
                     eom_token_dataset = config.model.motion_vq_model.nb_code  # 512
                     pad_token_dataset = config.model.motion_vq_model.nb_code + 1  # 513
                     
-                    # Get the actual special token IDs from uni_prompting
-                    eom_token_vocab = uni_prompting.sptids_dict["<|eom|>"].item()
-                    pad_token_vocab = uni_prompting.sptids_dict["[iPAD]"].item()
+                    # FIXED: Map special tokens to the END of motion vocabulary space
+                    # Motion tokens [0-511] map to [134541, 135052]
+                    # EOM token 512 maps to 135053
+                    # PAD token 513 maps to 135054
+                    eom_token_vocab = motion_token_offset + eom_token_dataset  # 134541 + 512 = 135053
+                    pad_token_vocab = motion_token_offset + pad_token_dataset  # 134541 + 513 = 135054
+                    
+                    # Verify these fit in our expanded vocabulary (should always pass now)
+                    assert eom_token_vocab < config.model.mmada.new_vocab_size, f"EOM token {eom_token_vocab} exceeds vocab size {config.model.mmada.new_vocab_size}"
+                    assert pad_token_vocab < config.model.mmada.new_vocab_size, f"PAD token {pad_token_vocab} exceeds vocab size {config.model.mmada.new_vocab_size}"
+                    
+                    # Debug logging for special token mapping
+                    if first_batch and accelerator.is_main_process:
+                        logger.info(f"🔍 Special token mapping debug:")
+                        logger.info(f"   EOM dataset token: {eom_token_dataset} -> vocab token: {eom_token_vocab}")
+                        logger.info(f"   PAD dataset token: {pad_token_dataset} -> vocab token: {pad_token_vocab}")
+                        logger.info(f"   Motion token offset: {motion_token_offset}")
+                        logger.info(f"   Expected motion range: [{motion_token_offset}, {motion_token_offset + motion_vocab_size - 1}]")
+                        logger.info(f"   Total motion + special tokens: [{motion_token_offset}, {pad_token_vocab}]")
                     
                     # Create offset tokens, but handle special tokens separately
                     m_tokens_offset = m_tokens.clone()
@@ -543,13 +603,21 @@ def main():
                     # Use UniversalPrompting system to format text-to-motion sequences
                     input_ids, attention_mask, labels = uni_prompting((captions, inp, lbl), 't2m')
                     
+                    # Debug logging for first batch
+                    if first_batch and accelerator.is_main_process:
+                        logger.info(f"🔍 First batch debug info:")
+                        logger.info(f"   Original motion tokens shape: {m_tokens.shape}")
+                        logger.info(f"   Motion token range: [{m_tokens.min().item()}, {m_tokens.max().item()}]")
+                        logger.info(f"   Offset motion token range: [{m_tokens_offset.min().item()}, {m_tokens_offset.max().item()}]")
+                        logger.info(f"   Masked input token range: [{inp.min().item()}, {inp.max().item()}]")
+                        logger.info(f"   Final input_ids shape: {input_ids.shape}")
+                        logger.info(f"   Mask probability: {mprob.mean().item():.3f}")
+                        first_batch = False
+                    
                     # Move to device
                     input_ids = input_ids.to(accelerator.device)
                     attention_mask = attention_mask.to(accelerator.device) 
                     labels = labels.to(accelerator.device)
-
-                    # Manual gradient accumulation instead of accelerator.accumulate()
-                    # to avoid conflict with DeepSpeed ZeRO stage 3
                     
                     # Use the dedicated forward_t2m method for text-to-motion training
                     loss = model.forward_t2m(
@@ -562,6 +630,9 @@ def main():
                     
                     # FIXED: Validate loss before proceeding
                     validate_loss(loss, global_step)
+                    
+                    # Store unscaled loss for logging
+                    unscaled_loss = loss.item()
                     
                     loss = loss / config.training.gradient_accumulation_steps
                     accelerator.backward(loss)
@@ -582,27 +653,46 @@ def main():
 
                     optimizer.step()
                     lr_scheduler.step()
+                    
+                    # Log gradient norm if configured (before incrementing global_step)
+                    if config.experiment.get('log_grad_norm_every', 0) > 0 and (global_step + 1) % config.experiment.log_grad_norm_every == 0:
+                        log_grad_norm(model, accelerator, global_step + 1)
+                    
                     optimizer.zero_grad(set_to_none=True)
                     
-                    # Update sync_gradients flag for logging
-                    sync_gradients = True
                     # Increment global_step only when we actually step the optimizer
                     global_step += 1
                     
+                    # Reset batch counter after optimizer step for correct gradient accumulation
+                    batch_count = 0
+                    
+                    # Set sync_gradients to True after optimizer step
+                    sync_gradients = True
+                    
                     # ---- Validation check: Ensure generated tokens are in valid range ----
-                    if global_step % 50 == 0:  # Check every 50 steps
+                    if global_step % config.experiment.val_every == 0:  # Check every val_every steps
                         with torch.no_grad():
                             # Sample a few captions for quick generation test
-                            test_idx = min(3, batch_size)
-                            test_captions = captions[:test_idx]
+                            test_idx = min(6, current_batch_size)  # Increased from 3 to 6 for better diversity assessment
+                            test_captions = current_captions[:test_idx]
                             
                             # Create test input with all motion tokens masked
-                            test_motion_tokens = torch.full((test_idx, motion_seq_len), mask_id, dtype=torch.long, device=accelerator.device)
-                            test_motion_tokens_offset = test_motion_tokens + motion_token_offset
+                            # FIXED: mask_id is already in full vocabulary space, so we need to create masked motion tokens differently
+                            # First create motion tokens filled with zeros, then pass them through build_mlm_batch
+                            test_motion_tokens_raw = torch.zeros((test_idx, current_motion_seq_len), dtype=torch.long, device=accelerator.device)
+                            # Add offset to place them in motion vocabulary range
+                            test_motion_tokens_offset = test_motion_tokens_raw + motion_token_offset
+                            
+                            # Create fully masked version using build_mlm_batch with 100% masking
+                            test_mask_schedule = lambda t: torch.ones_like(t)  # Always return 1.0 for full masking
+                            test_inp, test_lbl, _ = build_mlm_batch(
+                                test_motion_tokens_offset, mask_id, config, test_mask_schedule,
+                                text_vocab_size, image_codebook_size, False
+                            )
                             
                             # Format with uni_prompting
                             test_input_ids, test_attention_mask, _ = uni_prompting(
-                                (test_captions, test_motion_tokens_offset, test_motion_tokens_offset), 't2m'
+                                (test_captions, test_inp, test_lbl), 't2m'
                             )
                             
                             # Quick generation with fewer timesteps
@@ -613,8 +703,8 @@ def main():
                                     uni_prompting=uni_prompting,
                                     mask_token_id=mask_id,
                                     motion_vocab_size=motion_vocab_size,
-                                    seq_len=motion_seq_len,
-                                    timesteps=5,  # Fewer steps for quick check
+                                    seq_len=current_motion_seq_len,
+                                    timesteps=12,  # Increased from 5 to 12 for better diversity
                                     image_codebook_size=image_codebook_size,
                                 )
                                 
@@ -629,9 +719,18 @@ def main():
                                     
                                     # Check for special tokens in generated output
                                     unique_tokens = generated_tokens.unique()
+                                    total_tokens = generated_tokens.numel()
+                                    diversity_ratio = len(unique_tokens) / min(total_tokens, motion_vocab_size)
+                                    
                                     if motion_vocab_size in unique_tokens:
                                         logger.info(f"   Found end-of-motion token (512) in generation")
-                                    logger.info(f"   Unique tokens count: {len(unique_tokens)}")
+                                    logger.info(f"   Unique tokens: {len(unique_tokens)}/{total_tokens} (diversity: {diversity_ratio:.1%})")
+                                    
+                                    # Warning for potential mode collapse
+                                    if len(unique_tokens) < 10:
+                                        logger.warning(f"⚠️  Low diversity detected! Only {len(unique_tokens)} unique tokens generated.")
+                                        if len(unique_tokens) <= 3:
+                                            logger.warning(f"🚨 Possible mode collapse! Consider checking learning rate, loss weights, or generation parameters.")
                                     
                             except Exception as gen_error:
                                 logger.warning(f"⚠️  Quick generation test failed: {gen_error}")
@@ -647,7 +746,7 @@ def main():
                     if global_step % config.experiment.log_every == 0:
                         accelerator.log(
                             {
-                                "loss": loss.item() * config.training.gradient_accumulation_steps,  # Report unscaled loss
+                                "loss": unscaled_loss,
                                 "lr": lr_scheduler.get_last_lr()[0],
                                 "mask_rate": mprob.mean().item(),
                                 "batch_t": batch_t.val,
@@ -655,7 +754,7 @@ def main():
                             step=global_step,
                         )
                         batch_t.reset()
-                        logger.info(f"Step {global_step}: loss={loss.item() * config.training.gradient_accumulation_steps:.4f}, lr={lr_scheduler.get_last_lr()[0]:.2e}")
+                        logger.info(f"Step {global_step}: loss={unscaled_loss:.4f}, lr={lr_scheduler.get_last_lr()[0]:.2e}")
 
                     # ---- evaluation every eval_every ----------------------
                     if (global_step % config.experiment.eval_every) == 0:
@@ -715,10 +814,10 @@ def main():
                     if global_step % config.experiment.save_every == 0:
                         save_checkpoint(model, accelerator, config, global_step)
 
+                    # Check if we've reached max steps at the end of each epoch
                     if global_step >= config.training.max_train_steps:
+                        logger.info(f"✅ Reached max training steps ({config.training.max_train_steps})")
                         break
-            if global_step >= config.training.max_train_steps:
-                break
 
     except Exception as training_error:
         logger.error(f"❌ Training failed: {training_error}")
@@ -732,6 +831,17 @@ def main():
         )
         logger.info(f"✅ Training completed successfully! Final model saved to {config.experiment.output_dir}")
     accelerator.end_training()
+
+
+def log_grad_norm(model, accelerator, global_step):
+    """
+    Log gradient norms for each parameter.
+    """
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            grads = param.grad.detach().data
+            grad_norm = (grads.norm(p=2) / grads.numel()).item()
+            accelerator.log({"grad_norm/" + name: grad_norm}, step=global_step)
 
 
 if __name__ == "__main__":
