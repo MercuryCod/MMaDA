@@ -155,7 +155,7 @@ class MMadaModelLM(LLaDAModelLM):
         
         # If still not found, try to get from embeddings
         if vocab_size is None and hasattr(self, 'model') and hasattr(self.model, 'embed_tokens'):
-            vocab_size = self.model.embed_tokens.num_embeddings
+                vocab_size = self.model.embed_tokens.num_embeddings
             
         # If all else fails, use the expected value
         if vocab_size is None:
